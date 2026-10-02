@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1B2838">
+<title>FlotaApp</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #2c3e50; min-height: 100vh; }
+
+.nav-tabs { display: flex; background: #1B2838; border-bottom: 2px solid #2980B9; position: sticky; top: 0; z-index: 100; }
+.nav-tab { flex: 1; padding: 11px 4px; text-align: center; color: rgba(255,255,255,0.45); font-size: 10px; font-weight: 700; cursor: pointer; border: none; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: color 0.2s; }
+.nav-tab .ti { font-size: 18px; }
+.nav-tab.active { color: #fff; border-bottom: 3px solid #2980B9; }
+
+.header { background: #1B2838; color: white; padding: 11px 16px; display: flex; align-items: center; gap: 10px; }
+.header h1 { font-size: 16px; font-weight: 800; flex:1; }
+
+.page { display: none; }
+.page.active { display: block; }
+.container { max-width: 600px; margin: 0 auto; padding: 14px; }
+
+.card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+.card h2 { font-size: 14px; font-weight: 700; color: #1B2838; margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+
+.form-group { margin-bottom: 11px; }
+label { display: block; font-size: 11px; font-weight: 700; color: #777; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+input, select, textarea { width: 100%; padding: 11px 12px; border: 1.5px solid #dde3ea; border-radius: 8px; font-size: 15px; color: #2c3e50; background: #f8fafc; -webkit-appearance: none; appearance: none; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: #2980B9; background: white; }
+input[type="date"] { min-height: 44px; }
+textarea { resize: vertical; min-height: 65px; }
+select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.type-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-bottom: 12px; }
+.type-btn { padding: 10px 4px; border: 2px solid #dde3ea; border-radius: 10px; background: #f8fafc; text-align: center; cursor: pointer; font-size: 11px; font-weight: 700; color: #666; transition: all 0.15s; }
+.type-btn.active { border-color: #2980B9; background: #EBF5FB; color: #2980B9; }
+.type-btn .icon { font-size: 22px; display: block; margin-bottom: 3px; }
+
+.subtype-row { display: flex; gap: 7px; margin-bottom: 11px; }
+.subtype-btn { flex: 1; padding: 10px 4px; border: 2px solid #dde3ea; border-radius: 8px; background: #f8fafc; text-align: center; cursor: pointer; font-size: 11px; font-weight: 700; color: #666; }
+.subtype-btn.active { border-color: #27AE60; background: #EAFAF1; color: #27AE60; }
+
+.section-divider { font-size: 11px; font-weight: 700; color: #bbb; text-transform: uppercase; letter-spacing: 0.5px; margin: 12px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #f0f0f0; }
+
+.btn-primary { width: 100%; padding: 13px; background: #2980B9; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-green { background: #27AE60; width: 100%; padding: 13px; color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 10px; }
+.btn-red { background: #e74c3c; width: 100%; padding: 11px; color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+.record-item { padding: 10px; border: 1px solid #eee; border-radius: 8px; margin-bottom: 7px; background: #f9fbfc; }
+.rec-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+.rec-type { font-size: 12px; font-weight: 700; color: #2980B9; }
+.rec-amount { font-size: 13px; font-weight: 700; color: #27AE60; }
+.rec-details { font-size: 11px; color: #aaa; line-height: 1.5; }
+.btn-del { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 15px; padding: 0 3px; }
+
+.empty-msg { text-align: center; color: #ccc; font-size: 13px; padding: 22px 0; }
+.badge { background: #e74c3c; color: white; border-radius: 10px; font-size: 10px; padding: 2px 6px; margin-left: 5px; }
+
+/* CRM */
+.crm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+.crm-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.stat-box { background: #f0f7ff; border: 1px solid #c8dff5; border-radius: 10px; padding: 12px; text-align: center; }
+.stat-box .sv { font-size: 20px; font-weight: 800; color: #1B2838; }
+.stat-box .sl { font-size: 11px; color: #888; margin-top: 2px; }
+
+.chofer-card { background: white; border: 1.5px solid #e8edf2; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+.chofer-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.chofer-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; color: white; flex-shrink: 0; }
+.chofer-name { font-size: 15px; font-weight: 700; color: #1B2838; }
+.chofer-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+.status-activo { background: #D5F5E3; color: #1E8449; }
+.status-inactivo { background: #FDEBD0; color: #A04000; }
+.chofer-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.cs { background: #f8fafc; border-radius: 8px; padding: 8px; text-align: center; }
+.cs .cv { font-size: 13px; font-weight: 800; color: #2c3e50; }
+.cs .cl { font-size: 10px; color: #aaa; }
+.chofer-actions { display: flex; gap: 7px; }
+.btn-sm { flex: 1; padding: 8px; border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; }
+.btn-edit { background: #EBF5FB; color: #2980B9; }
+.btn-toggle { background: #FDEBD0; color: #A04000; }
+.btn-delete { background: #FADBD8; color: #C0392B; }
+
+/* HISTORIAL */
+.hist-card { background: #f0f7ff; border: 1px solid #c8dff5; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.hist-title { font-weight: 700; font-size: 13px; color: #1B2838; margin-bottom: 8px; }
+.hist-stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px solid #e0ecf8; }
+.hist-stat:last-child { border-bottom: none; font-weight: 700; }
+
+.hist-pend { font-size: 11px; color: #e67e22; font-weight: 700; margin-left: 4px; }
+.hist-info { font-size: 11px; color: #aaa; margin-bottom: 10px; }
+
+.toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #2c3e50; color: white; padding: 11px 22px; border-radius: 20px; font-size: 13px; opacity: 0; transition: opacity 0.3s; z-index: 999; pointer-events: none; white-space: nowrap; }
+.toast.show { opacity: 1; }
+.hidden { display: none !important; }
+
+/* LOADING CHOFERES */
+.choferes-loading { display:none; text-align:center; padding:22px 0; color:#2980B9; font-size:13px; font-weight:700; }
+.choferes-loading .spinner { display:inline-block; width:22px; height:22px; border:3px solid #c8dff5; border-top-color:#2980B9; border-radius:50%; animation:spin 0.7s linear infinite; margin-right:8px; vertical-align:middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* MODAL */
+.modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 300; overflow-y: auto; }
+.modal-sheet { background: white; border-radius: 16px 16px 0 0; position: fixed; bottom: 0; width: 100%; max-width: 600px; left: 50%; transform: translateX(-50%); padding: 20px; max-height: 85vh; overflow-y: auto; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.modal-header h2 { font-size: 15px; font-weight: 700; color: #1B2838; }
+.btn-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #aaa; line-height: 1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span>🚗</span>
+  <h1>FlotaApp</h1>
+  <div id="header_user" style="font-size:12px;font-weight:700;opacity:0.85;margin-right:4px"></div>
+  <button id="btn_logout" onclick="logout()" style="display:none;background:rgba(255,255,255,0.15);border:none;color:white;border-radius:6px;padding:5px 9px;font-size:11px;cursor:pointer">🔄 Cambiar</button>
+</div>
+
+<div class="nav-tabs" id="main_nav">
+  <button class="nav-tab" id="tab_crm" onclick="showPage('crm',this)"><span class="ti">🏠</span>Inicio</button>
+  <button class="nav-tab" id="tab_datos" onclick="showPage('datos',this)"><span class="ti">📡</span>Datos</button>
+  <button class="nav-tab active" id="tab_registro" onclick="showPage('registro',this)"><span class="ti">📋</span>Registro</button>
+  <button class="nav-tab" onclick="showPage('historial',this)"><span class="ti">📊</span>Historial</button>
+  <button class="nav-tab" onclick="showPage('enviar',this)"><span class="ti">📤</span>Enviar</button>
+</div>
+
+<!-- ===== DATOS SHEETS ===== -->
+<div id="page_datos" class="page">
+<div class="container">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0">📡 Datos Recibidos</h2>
+      <button onclick="loadSheetData()" style="background:#2980B9;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">🔄 Actualizar</button>
+    </div>
+    <!-- Filtros -->
+    <div class="row2" style="margin-bottom:12px">
+      <select id="datos_filtro_chofer" onchange="renderSheetData()">
+        <option value="">Todos los choferes</option>
+      </select>
+      <select id="datos_filtro_mes" onchange="renderSheetData()">
+        <option value="">Todos los meses</option>
+        <option>ENERO</option><option>FEBRERO</option><option>MARZO</option>
+        <option>ABRIL</option><option>MAYO</option><option>JUNIO</option>
+        <option>JULIO</option><option>AGOSTO</option><option>SEPTIEMBRE</option>
+        <option>OCTUBRE</option><option>NOVIEMBRE</option><option>DICIEMBRE</option>
+      </select>
+    </div>
+    <!-- Stats resumen -->
+    <div id="datos_stats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px"></div>
+    <!-- Lista -->
+    <div id="datos_list"><div class="empty-msg">Pulsa 🔄 para cargar datos</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ===== CRM ===== -->
+<div id="page_crm" class="page">
+<div class="container">
+  <div class="card">
+    <div class="crm-header">
+      <h2 style="margin:0">👥 Panel de Choferes</h2>
+      <div style="display:flex;gap:7px">
+        <button onclick="testScript()" style="background:rgba(41,128,185,0.15);color:#2980B9;border:1.5px solid #2980B9;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer">🔍 Test</button>
+        <button onclick="openAddChofer()" style="background:#2980B9;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer">+ Agregar</button>
+      </div>
+    </div>
+    <div class="crm-stats" id="crm_stats"></div>
+    <div id="choferes_loading" class="choferes-loading">
+      <span class="spinner"></span>Sincronizando choferes...
+    </div>
+    <div id="crm_choferes_list"></div>
+  </div>
+</div>
+</div>
+
+<!-- ===== REGISTRO ===== -->
+<div id="page_registro" class="page active">
+<div class="container">
+  <div class="card">
+    <h2>👤 Identificacion</h2>
+    <div class="form-group">
+      <label>Chofer</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="chofer" style="flex:1;min-width:0"></select>
+      </div>
+    </div>
+    <div class="form-group"><label>Fecha</label><input type="date" id="fecha" onchange="syncMesSemana()"></div>
+    <div class="row2">
+      <div class="form-group">
+        <label>Semana</label>
+        <select id="semana">
+          <option value="1">Semana 1</option><option value="2">Semana 2</option>
+          <option value="3">Semana 3</option><option value="4">Semana 4</option>
+          <option value="5">Semana 5</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Mes</label>
+        <select id="mes">
+          <option>ENERO</option><option>FEBRERO</option><option>MARZO</option>
+          <option>ABRIL</option><option>MAYO</option><option>JUNIO</option>
+          <option>JULIO</option><option>AGOSTO</option><option>SEPTIEMBRE</option>
+          <option>OCTUBRE</option><option>NOVIEMBRE</option><option>DICIEMBRE</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>⏱️ Jornada del Dia</h2>
+    <div class="row2">
+      <div class="form-group"><label>Hora inicio</label><input type="time" id="hora_inicio" onchange="saveJornada()"></div>
+      <div class="form-group"><label>Hora fin</label><input type="time" id="hora_fin" onchange="saveJornada()"></div>
+    </div>
+    <div class="row2">
+      <div class="form-group"><label>Km inicio</label><input type="number" id="km_inicio" placeholder="0" oninput="saveJornada()"></div>
+      <div class="form-group"><label>Km fin</label><input type="number" id="km_fin" placeholder="0" oninput="saveJornada()"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📋 Nuevo Registro</h2>
+    <div class="section-divider">Tipo</div>
+    <div class="type-grid">
+      <div class="type-btn" onclick="selectType('privado')" id="btn_privado"><span class="icon">🚖</span>Privado</div>
+      <div class="type-btn" onclick="selectType('datafono')" id="btn_datafono"><span class="icon">💳</span>Datáfono</div>
+      <div class="type-btn" onclick="selectType('peaje')" id="btn_peaje"><span class="icon">🛣️</span>Peaje</div>
+      <div class="type-btn" onclick="selectType('parking')" id="btn_parking"><span class="icon">🅿️</span>Parking</div>
+      <div class="type-btn" onclick="selectType('pinchazo')" id="btn_pinchazo"><span class="icon">🔧</span>Pinchazo</div>
+      <div class="type-btn" onclick="selectType('otro')" id="btn_otro"><span class="icon">📝</span>Otro</div>
+    </div>
+    <div id="field_subtype" class="hidden">
+      <div class="section-divider">Forma de pago</div>
+      <div class="subtype-row">
+        <div class="subtype-btn" onclick="selectSubtype('privado_efvo')" id="sub_privado_efvo">💵 Efectivo</div>
+        <div class="subtype-btn" onclick="selectSubtype('privado_datafono')" id="sub_privado_datafono">💳 Datáfono</div>
+        <div class="subtype-btn" onclick="selectSubtype('privado_nocobrar')" id="sub_privado_nocobrar">🎁 No cobrar</div>
+      </div>
+    </div>
+    <div id="field_importe">
+      <div class="form-group"><label>Importe (EUR)</label><input type="number" id="importe" placeholder="0.00" step="0.01" min="0"></div>
+    </div>
+    <div id="field_destino" class="hidden">
+      <div class="form-group"><label>Cliente / Destino</label><input type="text" id="destino" placeholder="Aeropuerto, nombre..."></div>
+    </div>
+    <div class="form-group"><label>Observaciones</label><textarea id="observaciones" placeholder="Notas adicionales..."></textarea></div>
+    <button class="btn-primary" onclick="addRecord()">➕ Agregar Registro</button>
+  </div>
+
+  <div class="card">
+    <h2>📄 Registros sin enviar <span class="badge" id="count_badge">0</span></h2>
+    <div id="records_list"><div class="empty-msg">Sin registros aun.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>📝 Novedades del Dia</h2>
+    <div class="form-group"><label>Incidencias o notas</label><textarea id="nota_jornada" style="min-height:90px" placeholder="Ej: Pinchazo a las 14h, incidencia con pasajero..."></textarea></div>
+    <button class="btn-primary" onclick="saveNota()">💾 Guardar Nota</button>
+  </div>
+</div>
+</div>
+
+<!-- ===== HISTORIAL ===== -->
+<div id="page_historial" class="page">
+<div class="container">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0">📊 Mi Historial</h2>
+      <button onclick="loadHistorial()" style="background:#2980B9;color:white;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer">🔄 Actualizar</button>
+    </div>
+    <div class="hist-info" id="hist_info">Todo lo enviado queda guardado en Google Sheets.</div>
+    <div class="form-group">
+      <select id="hist_mes" onchange="renderHistorial()">
+        <option value="">Todos los meses</option>
+        <option>ENERO</option><option>FEBRERO</option><option>MARZO</option>
+        <option>ABRIL</option><option>MAYO</option><option>JUNIO</option>
+        <option>JULIO</option><option>AGOSTO</option><option>SEPTIEMBRE</option>
+        <option>OCTUBRE</option><option>NOVIEMBRE</option><option>DICIEMBRE</option>
+      </select>
+    </div>
+    <div id="historial_content"><div class="empty-msg">Sin registros aun.</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ===== ENVIAR ===== -->
+<div id="page_enviar" class="page">
+<div class="container">
+  <div class="card">
+    <h2>📤 Enviar al Administrador</h2>
+    <p style="font-size:13px;color:#888;margin-bottom:14px">Los datos van directo a Google Sheets.</p>
+    <div style="background:#f0f7ff;border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:13px">
+        <span style="color:#666">Registros pendientes:</span><strong id="send_count">0</strong>
+      </div>
+    </div>
+    <button class="btn-green" id="btn_enviar" onclick="shareJSON()">📤 Enviar Datos</button>
+    <button class="btn-red" onclick="clearAll()">🗑️ Borrar registros sin enviar</button>
+    <p style="font-size:11px;color:#aaa;margin-top:8px;text-align:center">Lo ya enviado no se borra: queda en tu Historial.</p>
+  </div>
+</div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div id="modal_login" class="modal-overlay" style="display:none;background:#1B2838;z-index:500">
+  <div style="max-width:400px;margin:0 auto;padding:40px 20px">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-size:52px;margin-bottom:10px">🚗</div>
+      <h1 style="color:white;font-size:22px;font-weight:800;margin-bottom:6px">FlotaApp</h1>
+      <p style="color:rgba(255,255,255,0.45);font-size:13px">¿Quién sos? Tocá tu nombre</p>
+    </div>
+    <!-- Spinner de carga inicial -->
+    <div id="login_loading" style="text-align:center;padding:20px 0">
+      <div style="display:inline-block;width:32px;height:32px;border:3px solid rgba(255,255,255,0.2);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;margin-bottom:12px"></div>
+      <p style="color:rgba(255,255,255,0.5);font-size:13px">Cargando choferes...</p>
+    </div>
+    <div id="login_list"></div>
+    <div style="text-align:center;margin-top:20px">
+      <button onclick="openAdminLogin()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.45);border-radius:8px;padding:10px 20px;font-size:12px;cursor:pointer">🔒 Acceso Administrador</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR CHOFER -->
+<div id="modal_edit_chofer" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2 id="modal_edit_title">Chofer</h2>
+      <button class="btn-close" onclick="closeModal('modal_edit_chofer')">✕</button>
+    </div>
+    <div class="form-group"><label>Nombre</label><input id="edit_nombre" type="text" placeholder="Nombre completo"></div>
+    <div class="form-group"><label>Teléfono</label><input id="edit_telefono" type="tel" placeholder="+34 600 000 000"></div>
+    <div class="form-group"><label>Vehículo asignado</label><input id="edit_vehiculo" type="text" placeholder="Tesla Model Y - ABC1234"></div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="edit_estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select>
+    </div>
+    <div class="form-group" id="edit_liberar_box">
+      <label>Teléfono vinculado</label>
+      <div id="edit_liberar_info" style="font-size:12px;color:#888;margin-bottom:6px"></div>
+      <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#C0392B;letter-spacing:0">
+        <input id="edit_liberar" type="checkbox" style="width:auto"> 🔓 Liberar teléfono (para que entre desde otro)
+      </label>
+    </div>
+    <input type="hidden" id="edit_index">
+    <button class="btn-primary" onclick="saveChofer()" style="margin-top:6px">💾 Guardar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
+const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
+const AVATAR_COLORS =['#2980B9','#27AE60','#8E44AD','#D35400','#16A085','#C0392B','#34495E','#F39C12'];
+
+let records = JSON.parse(localStorage.getItem('flota_records') || '[]');
+let selectedType = '', selectedSubtype = '';
+localStorage.removeItem('flota_photos'); // libera el espacio de las fotos de versiones anteriores
+let currentUser = localStorage.getItem('flota_user') || null;
+let isAdmin = false;
+// Token que da el servidor al validar el PIN (el PIN ya no está en la página)
+let adminToken = localStorage.getItem('flota_admin_token') || '';
+// Token del chofer: lo da el servidor la primera vez que el chofer entra desde este teléfono
+let choferToken = localStorage.getItem('flota_chofer_token') || '';
+
+// Código único de este teléfono (se crea una vez y no cambia)
+let deviceId = localStorage.getItem('flota_device_id');
+if (!deviceId) {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  deviceId = [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+  localStorage.setItem('flota_device_id', deviceId);
+}
+
+// Registros del usuario actual (en un móvil compartido, nadie ve los registros de otro)
+function myRecords() { return isAdmin ? records : records.filter(r => r.chofer === currentUser); }
+
+// Choferes — fuente de verdad: Google Sheets. localStorage solo como caché offline.
+let choferes = [];
+let choferesLoaded = false;
+
+function parseCachedChoferes() {
+  const raw = localStorage.getItem('flota_choferes');
+  if (!raw) return ['JOUSEFF','YUNES','ADRIAN','MANUEL','JUAN','PAO','VANE']
+    .map(n => ({name:n, telefono:'', vehiculo:'', estado:'activo'}));
+  const parsed = JSON.parse(raw);
+  return parsed.map(c => typeof c === 'string' ? {name:c, telefono:'', vehiculo:'', estado:'activo'} : c);
+}
+
+// Carga choferes desde Google Sheets; si falla usa caché local
+async function loadChoferes(silent = false) {
+  if (!silent) showChoferesLoading(true);
+  try {
+    const res = await fetch(SCRIPT_URL + '?action=getChoferes', { method: 'GET', mode: 'cors' });
+    const json = await res.json();
+    if (json.status === 'ok' && Array.isArray(json.choferes)) {
+      choferes = json.choferes;
+      localStorage.setItem('flota_choferes', JSON.stringify(choferes));
+      choferesLoaded = true;
+    } else {
+      throw new Error('Respuesta inesperada');
+    }
+  } catch(e) {
+    // Si ya hay una lista en memoria se mantiene (antes se pisaba con la caché vieja
+    // y los choferes recién agregados/borrados "volvían atrás")
+    if (!choferes.length) choferes = parseCachedChoferes();
+    if (!silent) showToast('⚠️ Sin conexión — usando datos locales');
+  } finally {
+    showChoferesLoading(false);
+  }
+  renderChoferSelect();
+  if (isAdmin) renderCRM();
+}
+
+function showChoferesLoading(show) {
+  let el = document.getElementById('choferes_loading');
+  if (!el) return;
+  el.style.display = show ? 'block' : 'none';
+}
+
+// Escapa texto antes de meterlo en HTML (evita que un nombre o nota con < ' " rompa la pantalla)
+function esc(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Fecha local YYYY-MM-DD (toISOString usa UTC y de 00:00 a 02:00 daba el día anterior)
+function localDateStr(d) {
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+
+// POST a Apps Script leyendo la respuesta real (text/plain evita el preflight CORS)
+async function postToScript(obj) {
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    body: JSON.stringify(obj),
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+  });
+  const json = await res.json();
+  if (json.status !== 'ok') throw new Error(json.message || 'Respuesta con error');
+  return json;
+}
+
+// Envía operación de chofer a Google Sheets y recarga la lista confirmada
+async function syncChofer(action, data) {
+  try {
+    const json = await postToScript({
+      action,
+      token: adminToken,
+      chofer: {
+        name:     data.name     || '',
+        oldName:  data.oldName  || '',
+        telefono: data.telefono || '',
+        vehiculo: data.vehiculo || '',
+        estado:   data.estado   || 'activo',
+        liberar:  !!data.liberar
+      }
+    });
+    // Un Apps Script viejo no conoce estas acciones: guarda un registro vacío y responde sin "action"
+    if (!json.action) throw new Error('El Apps Script publicado está desactualizado');
+    await loadChoferes(true);
+    return true;
+  } catch(e) {
+    saveChoferes();
+    alert('⚠️ El cambio NO se guardó en Google Sheets.\n\n' + e.message +
+          '\n\nQuedó guardado solo en este dispositivo. Revisá la conexión o usá el botón 🔍 Test.');
+    return false;
+  }
+}
+
+const typeLabels = {
+  privado_efvo:'Privado Efectivo', privado_datafono:'Privado Datáfono', privado_nocobrar:'Privado (Sin cobrar)',
+  datafono:'Datáfono', peaje:'Peaje', parking:'Parking / Aeropuerto', pinchazo:'Pinchazo / Avería', otro:'Otro'
+};
+const typeIcons = {privado_efvo:'💵',privado_datafono:'💳',privado_nocobrar:'🎁',datafono:'💳',peaje:'🛣️',parking:'🅿️',pinchazo:'🔧',otro:'📝'};
+
+function saveChoferes() { localStorage.setItem('flota_choferes', JSON.stringify(choferes)); } // solo para caché offline
+function getChoferNames() { return choferes.filter(c=>c.estado==='activo').map(c=>c.name); }
+
+// Diagnóstico — verifica que el Apps Script está activo y responde
+async function testScript() {
+  showToast('🔍 Probando conexión...');
+  try {
+    const res  = await fetch(SCRIPT_URL + '?action=getChoferes', { method: 'GET', mode: 'cors' });
+    const json = await res.json();
+    if (json.status === 'ok' && Array.isArray(json.choferes)) {
+      showToast('✅ Script OK — ' + json.choferes.length + ' choferes en Sheets');
+    } else if (json.status === 'ok') {
+      alert('⚠️ El Apps Script responde, pero es una versión VIEJA sin gestión de choferes.\n\nPegá el código nuevo de google_apps_script.js y hacé Deploy → Manage deployments → Edit → New version.');
+    } else {
+      showToast('⚠️ Script responde pero con error: ' + JSON.stringify(json));
+    }
+  } catch(e) {
+    showToast('❌ Sin conexión o script no publicado: ' + e.message);
+    alert('❌ Error de conexión al Apps Script.\n\nAsegurate de:\n1. Haber pegado el código nuevo en Apps Script\n2. Haber hecho Deploy → New version\n3. Tener acceso a internet\n\nError: ' + e.message);
+  }
+}
+
+// ---- PAGES ----
+function showPage(name, tabEl) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page_' + name).classList.add('active');
+  if (tabEl) tabEl.classList.add('active');
+  if (name === 'historial') { renderHistorial(); loadHistorial(); }
+  if (name === 'enviar') updateSendCount();
+  if (name === 'crm') { renderCRM(); loadChoferes(true); } // refresca al entrar al panel
+}
+
+// ---- SESSION ----
+async function initSession() {
+  // Carga choferes desde Sheets (con fallback a caché local)
+  await loadChoferes();
+  // Chofer que ya estaba adentro antes de esta versión: se vincula este teléfono sin pedirle nada
+  if (currentUser && !isAdmin && !choferToken) {
+    try {
+      const json = await postToScript({ action: 'loginChofer', name: currentUser, device: deviceId });
+      if (json.token) { choferToken = json.token; localStorage.setItem('flota_chofer_token', json.token); }
+    } catch(e) {
+      if (e.message !== 'Failed to fetch') {   // otro teléfono ya tiene este perfil
+        alert('❌ ' + e.message);
+        currentUser = null; localStorage.removeItem('flota_user');
+      }
+    }
+  }
+  if (currentUser) { applySession(); }
+  else { showLoginModal(); }
+}
+
+function showLoginModal() {
+  const modal = document.getElementById('modal_login');
+  modal.style.display = 'block';
+  // Ocultar spinner, mostrar lista
+  document.getElementById('login_loading').style.display = 'none';
+  const activos = choferes.filter(c => c.estado === 'activo');
+  document.getElementById('login_list').innerHTML = activos.map((c, i) => `
+    <button data-name="${esc(c.name)}" onclick="loginAs(this.dataset.name)"
+      style="width:100%;padding:14px;margin-bottom:8px;background:rgba(255,255,255,0.07);
+             border:1.5px solid rgba(255,255,255,0.12);border-radius:10px;font-size:15px;
+             font-weight:700;color:white;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
+      <span style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]};width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px">${esc(c.name[0])}</span>
+      <span style="flex:1">${esc(c.name)}</span>
+      <span style="font-size:12px;opacity:0.5">${c.vinculado ? '📱' : ''}</span>
+    </button>`).join('');
+}
+
+// Vincula el chofer a este teléfono en el servidor; devuelve el token o null
+async function vincularChofer(name, silent) {
+  try {
+    const json = await postToScript({ action: 'loginChofer', name, device: deviceId });
+    if (!json.token) throw new Error('El Apps Script publicado está desactualizado');
+    return json.token;
+  } catch(e) {
+    if (!silent) alert('❌ ' + (e.message === 'Failed to fetch' ? 'Sin conexión — conectate a internet para entrar la primera vez' : e.message));
+    return null;
+  }
+}
+
+// Sin PIN: el chofer elige su nombre UNA vez y este teléfono queda fijo en su perfil.
+// Desde otro teléfono no se puede entrar con ese nombre (el servidor lo rechaza).
+async function loginAs(name) {
+  if (!confirm('¿Sos ' + name + '?\n\nEste teléfono va a quedar fijo en tu perfil. Para cambiarlo hace falta el administrador.')) return;
+  showToast('⏳ Entrando...');
+  const token = await vincularChofer(name);
+  if (!token) return;
+  choferToken = token;
+  currentUser = name; isAdmin = false;
+  localStorage.setItem('flota_user', name);
+  localStorage.setItem('flota_chofer_token', token);
+  document.getElementById('modal_login').style.display = 'none';
+  applySession();
+  showToast('👋 Bienvenido, ' + name + '!');
+}
+
+// Si el token dejó de valer (p. ej. el admin liberó el teléfono), se vuelve a vincular en silencio
+async function reauthChofer() {
+  const token = await vincularChofer(currentUser, true);
+  if (!token) return false;
+  choferToken = token;
+  localStorage.setItem('flota_chofer_token', token);
+  return true;
+}
+
+function applySession() {
+  loadHistorialCache(); // historial del usuario que entra (no el del anterior)
+  const sel = document.getElementById('chofer');
+  if (isAdmin) {
+    sel.disabled = false;
+    renderChoferSelect();
+    document.getElementById('header_user').textContent = '👑 Admin';
+    document.getElementById('tab_crm').style.display = 'flex';
+    document.getElementById('tab_datos').style.display = 'flex';
+    showPage('crm', document.getElementById('tab_crm'));
+  } else {
+    renderChoferSelect();
+    document.getElementById('header_user').textContent = currentUser;
+    document.getElementById('tab_crm').style.display = 'none';
+    document.getElementById('tab_datos').style.display = 'none';
+    showPage('registro', document.getElementById('tab_registro'));
+  }
+  document.getElementById('btn_logout').style.display = 'inline-block';
+}
+
+// Pide el PIN y lo valida en el servidor; devuelve el token o null
+async function askAndVerifyPin(message) {
+  const pin = prompt(message);
+  if (pin === null) return null;
+  showToast('⏳ Verificando PIN...');
+  try {
+    const json = await postToScript({ action: 'verifyPin', pin });
+    if (!json.token) throw new Error('El Apps Script publicado está desactualizado');
+    return json.token;
+  } catch(e) {
+    showToast('❌ ' + (e.message === 'Failed to fetch' ? 'Sin conexión — no se puede verificar el PIN' : e.message));
+    return null;
+  }
+}
+
+async function openAdminLogin() {
+  const token = await askAndVerifyPin('PIN de administrador:');
+  if (!token) return;
+  adminToken = token;
+  currentUser = 'ADMIN'; isAdmin = true;
+  localStorage.setItem('flota_user', 'ADMIN');
+  localStorage.setItem('flota_admin', '1');
+  localStorage.setItem('flota_admin_token', token);
+  document.getElementById('modal_login').style.display = 'none';
+  applySession();
+  showToast('👑 Modo administrador');
+}
+
+// El chofer queda bloqueado en su perfil: para cambiar de usuario hace falta el PIN de administrador
+async function logout() {
+  const token = await askAndVerifyPin('🔒 PIN de ADMINISTRADOR para cambiar de usuario:');
+  if (!token) return;
+  currentUser = null; isAdmin = false; adminToken = ''; choferToken = '';
+  localStorage.removeItem('flota_user');
+  localStorage.removeItem('flota_admin');
+  localStorage.removeItem('flota_admin_token');
+  localStorage.removeItem('flota_chofer_token');
+  document.getElementById('btn_logout').style.display = 'none';
+  document.getElementById('header_user').textContent = '';
+  showLoginModal();
+}
+
+// ---- CRM ----
+function renderCRM() {
+  const activos = choferes.filter(c=>c.estado==='activo').length;
+  const totalRec = records.length;
+  const totalEfvo = records.filter(r=>r.tipo==='privado_efvo').reduce((s,r)=>s+r.importe,0);
+  document.getElementById('crm_stats').innerHTML = `
+    <div class="stat-box"><div class="sv">${activos}</div><div class="sl">Choferes activos</div></div>
+    <div class="stat-box"><div class="sv">${totalRec}</div><div class="sl">Registros totales</div></div>
+    <div class="stat-box"><div class="sv">${totalEfvo.toFixed(0)}€</div><div class="sl">Efvo pendiente</div></div>
+    <div class="stat-box"><div class="sv">${choferes.length}</div><div class="sl">Choferes totales</div></div>`;
+
+  document.getElementById('crm_choferes_list').innerHTML = choferes.map((c,i) => {
+    const myRecs = records.filter(r=>r.chofer===c.name);
+    const total = myRecs.reduce((s,r)=>s+r.importe,0);
+    const privados = myRecs.filter(r=>r.tipo.startsWith('privado')).reduce((s,r)=>s+r.importe,0);
+    const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+    return `<div class="chofer-card">
+      <div class="chofer-card-header">
+        <div class="chofer-avatar" style="background:${color}">${esc(c.name[0])}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div class="chofer-name">${esc(c.name)}</div>
+            <span class="chofer-status status-${esc(c.estado)}">${esc(c.estado)}</span>
+            ${c.vinculado
+              ? '<span class="chofer-status" style="background:#EBF5FB;color:#2980B9">📱 Vinculado</span>'
+              : '<span class="chofer-status" style="background:#f0f0f0;color:#888">Sin teléfono</span>'}
+          </div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px">
+            ${esc(c.telefono||'Sin teléfono')} · ${esc(c.vehiculo||'Sin vehículo')}
+          </div>
+        </div>
+      </div>
+      <div class="chofer-stats">
+        <div class="cs"><div class="cv">${myRecs.length}</div><div class="cl">Registros</div></div>
+        <div class="cs"><div class="cv">${total.toFixed(0)}€</div><div class="cl">Total</div></div>
+        <div class="cs"><div class="cv">${privados.toFixed(0)}€</div><div class="cl">Privados</div></div>
+      </div>
+      <div class="chofer-actions">
+        <button class="btn-sm btn-edit" onclick="editChofer(${i})">✏️ Editar</button>
+        <button class="btn-sm btn-toggle" onclick="toggleChofer(${i})">${c.estado==='activo'?'⏸ Desactivar':'▶ Activar'}</button>
+        <button class="btn-sm btn-delete" onclick="deleteChofer(${i})">🗑️ Borrar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAddChofer() {
+  document.getElementById('modal_edit_title').textContent = '➕ Nuevo Chofer';
+  document.getElementById('edit_nombre').value = '';
+  document.getElementById('edit_telefono').value = '';
+  document.getElementById('edit_vehiculo').value = '';
+  document.getElementById('edit_estado').value = 'activo';
+  document.getElementById('edit_liberar_box').style.display = 'none'; // un chofer nuevo no tiene teléfono
+  document.getElementById('edit_liberar').checked = false;
+  document.getElementById('edit_index').value = '-1';
+  document.getElementById('modal_edit_chofer').style.display = 'block';
+}
+
+function editChofer(i) {
+  const c = choferes[i];
+  document.getElementById('modal_edit_title').textContent = '✏️ Editar: ' + c.name;
+  document.getElementById('edit_nombre').value = c.name;
+  document.getElementById('edit_telefono').value = c.telefono || '';
+  document.getElementById('edit_vehiculo').value = c.vehiculo || '';
+  document.getElementById('edit_estado').value = c.estado || 'activo';
+  document.getElementById('edit_liberar_box').style.display = c.vinculado ? 'block' : 'none';
+  document.getElementById('edit_liberar_info').textContent =
+    '📱 ' + c.name + ' ya entró desde su teléfono. Nadie más puede usar este perfil.';
+  document.getElementById('edit_liberar').checked = false;
+  document.getElementById('edit_index').value = i;
+  document.getElementById('modal_edit_chofer').style.display = 'block';
+}
+
+async function saveChofer() {
+  const i = parseInt(document.getElementById('edit_index').value);
+  const nombre = document.getElementById('edit_nombre').value.trim().toUpperCase();
+  if (!nombre) { showToast('⚠️ Escribe un nombre'); return; }
+  // Evitar duplicados: otro chofer con el mismo nombre
+  if (choferes.some((c,j) => j !== i && c.name.toUpperCase() === nombre)) {
+    showToast('⚠️ Ya existe un chofer con ese nombre'); return;
+  }
+  const liberar = i !== -1 && document.getElementById('edit_liberar').checked;
+  if (liberar && !confirm('¿Liberar el teléfono de ' + choferes[i].name + '?\n\nLa próxima vez podrá entrar desde un teléfono nuevo.')) return;
+  const obj = {
+    name: nombre,
+    telefono: document.getElementById('edit_telefono').value.trim(),
+    vehiculo: document.getElementById('edit_vehiculo').value.trim(),
+    estado: document.getElementById('edit_estado').value,
+    vinculado: i === -1 ? false : (liberar ? false : choferes[i].vinculado)
+  };
+  // Si se renombró, el servidor busca la fila por el nombre anterior (antes creaba un duplicado)
+  const oldName = i === -1 ? '' : choferes[i].name;
+
+  // Actualizar lista local optimistamente
+  if (i === -1) { choferes.push(obj); }
+  else { choferes[i] = obj; }
+
+  closeModal('modal_edit_chofer');
+  showToast('⏳ Guardando...');
+
+  const action = i === -1 ? 'addChofer' : 'updateChofer';
+  const ok = await syncChofer(action, { ...obj, oldName, liberar });
+  showToast(ok ? (liberar ? '🔓 Teléfono liberado' : i === -1 ? '✅ Chofer agregado en todos los dispositivos' : '✅ Chofer actualizado en todos los dispositivos')
+                : '✅ Guardado localmente (sin conexión)');
+  renderCRM();
+  renderChoferSelect();
+}
+
+async function toggleChofer(i) {
+  choferes[i].estado = choferes[i].estado === 'activo' ? 'inactivo' : 'activo';
+  const obj = { ...choferes[i] };
+  renderCRM(); renderChoferSelect();
+  showToast('⏳ Sincronizando...');
+  const ok = await syncChofer('updateChofer', obj);
+  showToast(ok ? '✅ Estado actualizado en todos los dispositivos' : '✅ Guardado localmente (sin conexión)');
+}
+
+async function deleteChofer(i) {
+  if (!confirm('¿Borrar a ' + choferes[i].name + '? Se eliminará en todos los dispositivos.')) return;
+  const nombre = choferes[i].name;
+  choferes.splice(i, 1);
+  renderCRM(); renderChoferSelect();
+  showToast('⏳ Eliminando...');
+  const ok = await syncChofer('deleteChofer', { name: nombre });
+  showToast(ok ? '🗑️ Chofer eliminado en todos los dispositivos' : '🗑️ Eliminado localmente (sin conexión)');
+}
+
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+// ---- CHOFER SELECT ----
+function renderChoferSelect() {
+  const sel = document.getElementById('chofer');
+  // Un chofer logueado solo puede registrar a su nombre (antes una recarga de la lista le desbloqueaba el selector)
+  if (currentUser && !isAdmin) {
+    sel.innerHTML = `<option value="${esc(currentUser)}" selected>${esc(currentUser)}</option>`;
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Seleccionar...</option>' +
+    getChoferNames().map(n=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${esc(n)}</option>`).join('');
+}
+
+// ---- TIPO/SUBTIPO ----
+function selectType(type) {
+  selectedType = type; selectedSubtype = '';
+  document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn_' + type).classList.add('active');
+  document.querySelectorAll('.subtype-btn').forEach(b=>b.classList.remove('active'));
+  const isP = type === 'privado';
+  document.getElementById('field_subtype').classList.toggle('hidden', !isP);
+  document.getElementById('field_destino').classList.toggle('hidden', !isP);
+  if (isP) document.getElementById('field_importe').classList.add('hidden');
+  else document.getElementById('field_importe').classList.remove('hidden');
+}
+
+function selectSubtype(sub) {
+  selectedSubtype = sub;
+  document.querySelectorAll('.subtype-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sub_' + sub).classList.add('active');
+  document.getElementById('field_importe').classList.toggle('hidden', sub === 'privado_nocobrar');
+}
+
+// ---- RECORDS ----
+function addRecord() {
+  const chofer = document.getElementById('chofer').value;
+  if (!chofer) { showToast('⚠️ Selecciona un chofer'); return; }
+  if (!selectedType) { showToast('⚠️ Selecciona el tipo'); return; }
+  if (selectedType === 'privado' && !selectedSubtype) { showToast('⚠️ Selecciona forma de pago'); return; }
+  const finalType = selectedType === 'privado' ? selectedSubtype : selectedType;
+  const importe = finalType === 'privado_nocobrar' ? 0 : (parseFloat(document.getElementById('importe').value)||0);
+  if (importe<=0 && !['peaje','parking','pinchazo','otro','privado_nocobrar'].includes(finalType)) {
+    showToast('⚠️ Ingresa un importe'); return;
+  }
+  const rec = {
+    id: Date.now(), chofer,
+    fecha: document.getElementById('fecha').value,
+    semana: document.getElementById('semana').value,
+    mes: document.getElementById('mes').value,
+    tipo: finalType, tipo_label: typeLabels[finalType]||finalType, importe,
+    destino: document.getElementById('destino').value,
+    hora_inicio: document.getElementById('hora_inicio').value,
+    hora_fin: document.getElementById('hora_fin').value,
+    km_inicio: parseInt(document.getElementById('km_inicio').value)||0,
+    km_fin: parseInt(document.getElementById('km_fin').value)||0,
+    observaciones: document.getElementById('observaciones').value,
+    timestamp: new Date().toISOString()
+  };
+  records.push(rec);
+  localStorage.setItem('flota_records', JSON.stringify(records));
+  renderRecords(); resetForm(); updateSendCount();
+  showToast('✅ Registro agregado');
+}
+
+function renderRecords() {
+  const list = document.getElementById('records_list');
+  const mine = myRecords();
+  document.getElementById('count_badge').textContent = mine.length;
+  if (!mine.length) { list.innerHTML = '<div class="empty-msg">Sin registros aun.</div>'; return; }
+  list.innerHTML = mine.slice().reverse().map(r=>`
+    <div class="record-item">
+      <div class="rec-header">
+        <span class="rec-type">${typeIcons[r.tipo]||'📝'} ${esc(r.tipo_label)}</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="rec-amount">${r.importe>0?r.importe.toFixed(2)+' €':'-'}</span>
+          <button class="btn-del" onclick="deleteRecord(${r.id})">✕</button>
+        </div>
+      </div>
+      <div class="rec-details">
+        ${esc(r.chofer)} · ${esc(r.mes)} S${esc(r.semana)} · ${esc(r.fecha)}
+        ${r.destino?' · '+esc(r.destino):''}
+        ${r.hora_inicio?' · '+esc(r.hora_inicio)+(r.hora_fin?'-'+esc(r.hora_fin):''):''}
+        ${r.km_inicio||r.km_fin?' · '+esc(r.km_inicio)+'-'+esc(r.km_fin)+' km':''}
+        ${r.observaciones?'<br><em>'+esc(r.observaciones)+'</em>':''}
+      </div>
+    </div>`).join('');
+}
+
+function deleteRecord(id) {
+  records = records.filter(r=>r.id!==id);
+  localStorage.setItem('flota_records', JSON.stringify(records));
+  renderRecords(); updateSendCount(); showToast('🗑️ Eliminado');
+}
+
+// Jornada (horas y km): se conserva entre registros y al recargar la página
+const JORNADA_FIELDS = ['hora_inicio','hora_fin','km_inicio','km_fin'];
+
+function saveJornada() {
+  const j = {};
+  JORNADA_FIELDS.forEach(id => { j[id] = document.getElementById(id).value; });
+  localStorage.setItem('flota_jornada', JSON.stringify(j));
+}
+
+function loadJornada() {
+  const j = JSON.parse(localStorage.getItem('flota_jornada') || '{}');
+  JORNADA_FIELDS.forEach(id => { if (j[id]) document.getElementById(id).value = j[id]; });
+}
+
+function clearJornada() {
+  localStorage.removeItem('flota_jornada');
+  JORNADA_FIELDS.forEach(id => { document.getElementById(id).value = ''; });
+}
+
+// Limpia solo los campos del registro; la jornada NO se borra (antes se perdía tras el primer registro)
+function resetForm() {
+  ['importe','observaciones','destino']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  selectedType=''; selectedSubtype='';
+  document.querySelectorAll('.type-btn,.subtype-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('field_subtype').classList.add('hidden');
+  document.getElementById('field_destino').classList.add('hidden');
+  document.getElementById('field_importe').classList.remove('hidden');
+}
+
+// ---- HISTORIAL ----
+// Antes salía solo de los registros del móvil y se vaciaba al enviar/borrar.
+// Ahora sale de Google Sheets (lo enviado nunca se pierde) + lo que falta enviar.
+let historialRows = [];
+
+function historialKey() { return 'flota_historial_' + (isAdmin ? 'ADMIN' : currentUser); }
+
+// Última copia descargada, para verla sin conexión
+function loadHistorialCache() {
+  try { historialRows = JSON.parse(localStorage.getItem(historialKey()) || '[]'); }
+  catch(e) { historialRows = []; }
+}
+
+async function loadHistorial() {
+  if (!currentUser) return;
+  const info = document.getElementById('hist_info');
+  info.textContent = '⏳ Cargando historial...';
+  try {
+    const url = isAdmin
+      ? SCRIPT_URL + '?action=getRegistros&token=' + encodeURIComponent(adminToken)
+      : SCRIPT_URL + '?action=getHistorial&chofer=' + encodeURIComponent(currentUser) + '&token=' + encodeURIComponent(choferToken);
+    const json = await (await fetch(url)).json();
+    // Sesión vencida (el admin cambió el PIN): se pide el PIN otra vez y se reintenta
+    if (json.message === 'No autorizado' && !isAdmin) {
+      if (await reauthChofer()) return loadHistorial();
+    }
+    if (json.status !== 'ok') throw new Error(json.message || 'Error');
+    historialRows = (json.rows || []).map(r => ({
+      id: String(r['ID'] || ''),
+      chofer: String(r['CHOFER'] || ''),
+      mes: String(r['MES'] || '').toUpperCase(),
+      semana: String(r['SEMANA'] || ''),
+      tipo: String(r['TIPO'] || ''),
+      importe: parseFloat(r['IMPORTE']) || 0
+    }));
+    try { localStorage.setItem(historialKey(), JSON.stringify(historialRows)); } catch(e) {}
+    info.textContent = 'Todo lo enviado queda guardado en Google Sheets.';
+  } catch(e) {
+    loadHistorialCache();
+    info.textContent = e.message === 'No autorizado'
+      ? '🔒 Ingresá tu PIN para ver el historial (tocá 🔄 Actualizar).'
+      : '⚠️ Sin conexión — mostrando la última copia guardada.';
+  }
+  renderHistorial();
+}
+
+const MES_ORDEN = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+function renderHistorial() {
+  const filtMes = document.getElementById('hist_mes').value;
+  const userFilter = isAdmin ? null : currentUser;
+  // Enviados (Sheets) + pendientes del móvil que todavía no están en Sheets
+  const enviadosIds = new Set(historialRows.map(r => r.id));
+  const pendientes = myRecords().filter(r => !enviadosIds.has(String(r.id)))
+    .map(r => ({ ...r, importe: Number(r.importe) || 0, pendiente: true }));
+  const filtered = historialRows.concat(pendientes).filter(r =>
+    (!userFilter || r.chofer===userFilter) && (!filtMes || r.mes===filtMes)
+  );
+  const el = document.getElementById('historial_content');
+  if (!filtered.length) { el.innerHTML='<div class="empty-msg">Sin registros.</div>'; return; }
+  const bySemana = {};
+  filtered.forEach(r => {
+    const key = `${r.mes} - Semana ${r.semana}`;
+    if (!bySemana[key]) bySemana[key]=[];
+    bySemana[key].push(r);
+  });
+  // Lo más reciente primero
+  const orden = k => { const [m, s] = k.split(' - Semana '); return MES_ORDEN.indexOf(m) * 10 + (Number(s) || 0); };
+  el.innerHTML = Object.entries(bySemana).sort((a,b) => orden(b[0]) - orden(a[0])).map(([key,recs])=>{
+    const tP=recs.filter(r=>String(r.tipo).startsWith('privado')).reduce((s,r)=>s+r.importe,0);
+    const tD=recs.filter(r=>r.tipo==='datafono').reduce((s,r)=>s+r.importe,0);
+    const tG=recs.filter(r=>['peaje','parking','pinchazo'].includes(r.tipo)).reduce((s,r)=>s+r.importe,0);
+    const tot=recs.reduce((s,r)=>s+r.importe,0);
+    const pend=recs.filter(r=>r.pendiente).length;
+    return `<div class="hist-card">
+      <div class="hist-title">📅 ${esc(key)} · ${recs.length} registros${pend ? `<span class="hist-pend">⏳ ${pend} sin enviar</span>` : ''}</div>
+      <div class="hist-stat"><span>💵 Privados:</span><span>${tP.toFixed(2)} €</span></div>
+      <div class="hist-stat"><span>💳 Datáfono:</span><span>${tD.toFixed(2)} €</span></div>
+      <div class="hist-stat"><span>🚗 Gastos:</span><span>${tG.toFixed(2)} €</span></div>
+      <div class="hist-stat"><span>TOTAL:</span><span>${tot.toFixed(2)} €</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ---- ENVIAR ----
+function updateSendCount() {
+  document.getElementById('send_count').textContent = myRecords().length;
+}
+
+let sending = false;
+
+// Días ("CHOFER|AAAA-MM-DD") cuya jornada con km ya se envió desde este teléfono
+function getJornadasEnviadas() {
+  try { return JSON.parse(localStorage.getItem('flota_jornadas_enviadas') || '[]'); }
+  catch(e) { return []; }
+}
+
+async function shareJSON() {
+  const mine = myRecords();
+  if (!mine.length) { showToast('⚠️ No hay registros'); return; }
+  if (sending) return; // evita doble envío por doble toque
+  // Km de inicio y fin obligatorios para calcular los km recorridos,
+  // salvo registros olvidados de un día cuya jornada (con km) ya se envió desde este teléfono
+  const kmIni = Number(document.getElementById('km_inicio').value) || 0;
+  const kmFin = Number(document.getElementById('km_fin').value) || 0;
+  const enviadas = getJornadasEnviadas();
+  const kmYaPuestos = mine.every(r => enviadas.includes(r.chofer + '|' + r.fecha));
+  const kmFaltan = !kmIni || !kmFin;
+  const kmMal = kmIni && kmFin && kmFin <= kmIni;
+  if (KM_OBLIGATORIOS && !isAdmin && (kmMal || (kmFaltan && !kmYaPuestos))) {
+    alert(kmFaltan
+      ? '🔢 Completá los Km inicio y Km fin de la jornada (pestaña Registro).'
+      : '🔢 El Km fin (' + kmFin + ') tiene que ser mayor que el Km inicio (' + kmIni + ').');
+    showPage('registro', document.getElementById('tab_registro'));
+    return;
+  }
+  sending = true;
+  const btn = document.getElementById('btn_enviar');
+  btn.disabled = true; btn.style.opacity = '0.6';
+  showToast('📤 Enviando...');
+
+  // Clean records ensuring numbers are actual numbers
+  const cleanRecords = mine.map(r => ({
+    ...r,
+    importe: Number(r.importe) || 0,
+    km_inicio: Number(r.km_inicio) || 0,
+    km_fin: Number(r.km_fin) || 0,
+    semana: Number(r.semana) || 0
+  }));
+
+  // Build jornada object from current form values
+  const jornada = {
+    chofer: document.getElementById('chofer').value || (mine[0]?.chofer || ''),
+    fecha: document.getElementById('fecha').value || (mine[0]?.fecha || ''),
+    mes: document.getElementById('mes').value || (mine[0]?.mes || ''),
+    semana: Number(document.getElementById('semana').value) || (Number(mine[0]?.semana) || 0),
+    hora_inicio: document.getElementById('hora_inicio').value,
+    hora_fin: document.getElementById('hora_fin').value,
+    km_inicio: Number(document.getElementById('km_inicio').value) || 0,
+    km_fin: Number(document.getElementById('km_fin').value) || 0,
+    nota: localStorage.getItem('flota_nota') || ''
+  };
+
+  const payload = {
+    records: cleanRecords,
+    jornada: jornada,
+    nota: jornada.nota
+  };
+
+  // Identificación: el chofer con su token, el admin con el suyo
+  const auth = () => isAdmin ? { token: adminToken } : { chofer_name: currentUser, chofer_token: choferToken };
+
+  try {
+    // Se lee la respuesta de Google Sheets y solo se confirma si realmente se guardó.
+    try {
+      await postToScript({ ...payload, ...auth() });
+    } catch(err) {
+      // Sesión vencida (el admin cambió el PIN): pedir el PIN y reintentar una vez
+      if (err.message !== 'No autorizado' || isAdmin || !(await reauthChofer())) throw err;
+      await postToScript({ ...payload, ...auth() });
+    }
+
+    // Se recuerdan los días con km enviados: un registro olvidado de ese día no vuelve a pedir km
+    if (kmIni && kmFin) {
+      const dias = new Set(getJornadasEnviadas());
+      mine.forEach(r => dias.add(r.chofer + '|' + r.fecha));
+      try { localStorage.setItem('flota_jornadas_enviadas', JSON.stringify([...dias].slice(-120))); } catch(_) {}
+    }
+
+    // Ya está en Sheets: se limpian los pendientes del móvil y pasan al Historial (que no se borra)
+    const sentIds = new Set(mine.map(r => r.id));
+    records = records.filter(r => !sentIds.has(r.id));
+    localStorage.setItem('flota_records', JSON.stringify(records)); localStorage.removeItem('flota_nota');
+    clearJornada();
+    renderRecords(); updateSendCount();
+    document.getElementById('nota_jornada').value='';
+    alert('✅ Enviado correctamente.\n\nQuedó guardado en tu Historial.');
+    loadHistorial();
+  } catch(e) {
+    // No se pudo confirmar: se conservan los registros y se descarga una copia de respaldo
+    // La copia de respaldo puede no descargarse si la app está abierta desde el link de Google
+    try {
+      const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+      a.download=`flota_${jornada.chofer||'chofer'}_${localDateStr(new Date())}.json`; a.click();
+    } catch(_) {}
+    alert('❌ No se pudo confirmar el envío (' + e.message + ').\n\nTus registros siguen guardados en el móvil. Probá de nuevo con conexión — no se van a duplicar.');
+  } finally {
+    sending = false;
+    btn.disabled = false; btn.style.opacity = '';
+  }
+}
+
+function saveNota() {
+  const nota = document.getElementById('nota_jornada').value.trim();
+  if (nota) localStorage.setItem('flota_nota', nota);
+  else localStorage.removeItem('flota_nota'); // permite borrar la nota
+  showToast('💾 Nota guardada');
+}
+
+// Solo borra lo que todavía no se envió; el historial (Sheets) no se toca
+function clearAll() {
+  const mine = myRecords();
+  if (!mine.length) { showToast('No hay registros sin enviar'); return; }
+  if (!confirm('¿Borrar los ' + mine.length + ' registros SIN ENVIAR?\n\nLo ya enviado sigue en el Historial.')) return;
+  records = records.filter(r => !mine.includes(r)); localStorage.setItem('flota_records', JSON.stringify(records));
+  clearJornada();
+  renderRecords(); updateSendCount(); showToast('🗑️ Borrado');
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ---- DATOS SHEETS ----
+let sheetData = [];
+
+async function loadSheetData() {
+  document.getElementById('datos_list').innerHTML = '<div class="empty-msg">⏳ Cargando...</div>';
+  try {
+    const res = await fetch(SCRIPT_URL + '?action=getRegistros&token=' + encodeURIComponent(adminToken), { method: 'GET', mode: 'cors' });
+    const json = await res.json();
+    if (json.status === 'ok') {
+      sheetData = json.rows || [];
+      // Populate chofer filter
+      const choferesList = [...new Set(sheetData.map(r => r['CHOFER']).filter(Boolean))].sort();
+      const sel = document.getElementById('datos_filtro_chofer');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">Todos los choferes</option>' +
+        choferesList.map(c => `<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(c)}</option>`).join('');
+      renderSheetData();
+      showToast('✅ ' + sheetData.length + ' registros cargados');
+    } else {
+      document.getElementById('datos_list').innerHTML = json.message === 'No autorizado'
+        ? '<div class="empty-msg">🔒 Sesión de admin vencida — tocá 🔄 Cambiar y volvé a entrar con el PIN</div>'
+        : '<div class="empty-msg">❌ Error al cargar</div>';
+    }
+  } catch(e) {
+    document.getElementById('datos_list').innerHTML = '<div class="empty-msg">❌ Sin conexión o script no actualizado</div>';
+    showToast('❌ Error: ' + e.message);
+  }
+}
+
+function renderSheetData() {
+  const filtChofer = document.getElementById('datos_filtro_chofer').value;
+  const filtMes = document.getElementById('datos_filtro_mes').value;
+
+  let filtered = sheetData.filter(r =>
+    (!filtChofer || r['CHOFER'] === filtChofer) &&
+    (!filtMes || String(r['MES']).toUpperCase() === filtMes)
+  );
+
+  // Stats
+  const totalImporte = filtered.reduce((s,r) => s + (parseFloat(r['IMPORTE'])||0), 0);
+  const privados = filtered.filter(r => String(r['TIPO']||'').toLowerCase().includes('privado'));
+  const totalPriv = privados.reduce((s,r) => s + (parseFloat(r['IMPORTE'])||0), 0);
+  document.getElementById('datos_stats').innerHTML = `
+    <div class="cs" style="background:#f0f7ff;border-radius:8px;padding:10px;text-align:center">
+      <div class="cv" style="font-size:15px;font-weight:800;color:#1B2838">${filtered.length}</div>
+      <div class="cl" style="font-size:10px;color:#888;margin-top:2px">Registros</div>
+    </div>
+    <div class="cs" style="background:#f0fff4;border-radius:8px;padding:10px;text-align:center">
+      <div class="cv" style="font-size:15px;font-weight:800;color:#1B2838">${totalImporte.toFixed(0)}€</div>
+      <div class="cl" style="font-size:10px;color:#888;margin-top:2px">Total</div>
+    </div>
+    <div class="cs" style="background:#fff8f0;border-radius:8px;padding:10px;text-align:center">
+      <div class="cv" style="font-size:15px;font-weight:800;color:#1B2838">${totalPriv.toFixed(0)}€</div>
+      <div class="cl" style="font-size:10px;color:#888;margin-top:2px">Privados</div>
+    </div>`;
+
+  if (!filtered.length) {
+    document.getElementById('datos_list').innerHTML = '<div class="empty-msg">Sin datos para este filtro</div>';
+    return;
+  }
+
+  // Group by chofer if showing all
+  const grouped = {};
+  filtered.forEach(r => {
+    const key = r['CHOFER'] || 'Sin chofer';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(r);
+  });
+
+  document.getElementById('datos_list').innerHTML = Object.entries(grouped).map(([chofer, rows]) => {
+    const tot = rows.reduce((s,r)=>s+(parseFloat(r['IMPORTE'])||0),0);
+    const rowsHtml = rows.slice().reverse().map(r => `
+      <div style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700;color:#2980B9">${esc(r['TIPO_LABEL']||r['TIPO']||'-')}</span>
+          <span style="font-weight:700;color:#27AE60">${(parseFloat(r['IMPORTE'])||0).toFixed(2)} €</span>
+        </div>
+        <div style="color:#aaa;margin-top:2px">
+          ${esc(r['MES']||'')} S${esc(r['SEMANA']||'')} · ${esc(r['FECHA']||'')}
+          ${r['DESTINO'] ? ' · '+esc(r['DESTINO']) : ''}
+          ${r['HORA_INICIO'] ? ' · '+esc(r['HORA_INICIO'])+(r['HORA_FIN']?'-'+esc(r['HORA_FIN']):'') : ''}
+          ${r['KM_INICIO']||r['KM_FIN'] ? ' · '+esc(r['KM_INICIO'])+'-'+esc(r['KM_FIN'])+' km' : ''}
+          ${r['OBSERVACIONES'] ? '<br><em>'+esc(r['OBSERVACIONES'])+'</em>' : ''}
+        </div>
+      </div>`).join('');
+
+    return `<div style="border:1.5px solid #e0eaf4;border-radius:10px;overflow:hidden;margin-bottom:10px">
+      <div style="background:#1B2838;color:white;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:13px">👤 ${esc(chofer)}</span>
+        <span style="font-size:12px;opacity:0.8">${rows.length} reg · ${tot.toFixed(2)} €</span>
+      </div>
+      ${rowsHtml}
+    </div>`;
+  }).join('');
+}
+
+// Hide datos tab initially (admin only)
+document.getElementById('tab_datos').style.display = 'none';
+
+// ── Fecha, mes y semana automáticos ──
+const MESES = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
+               'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+// Al cambiar la fecha, mes y semana se ajustan solos (antes quedaban los de hoy)
+function syncMesSemana() {
+  const val = document.getElementById('fecha').value;
+  if (!val) return;
+  const [y, m, d] = val.split('-').map(Number);
+  document.getElementById('mes').value = MESES[m - 1];
+  document.getElementById('semana').value = String(Math.min(5, Math.ceil(d / 7)));
+}
+
+(function setFechaHoy() {
+  const hoy = new Date();
+  document.getElementById('fecha').value = localDateStr(hoy);
+  syncMesSemana();
+  // Historial — preseleccionar mes actual
+  document.getElementById('hist_mes').value = MESES[hoy.getMonth()];
+})();
+loadJornada();
+document.getElementById('nota_jornada').value = localStorage.getItem('flota_nota') || '';
+renderChoferSelect();
+renderRecords();
+updateSendCount();
+
+// Check admin flag
+if (localStorage.getItem('flota_admin') === '1' && adminToken) { isAdmin = true; }
+else if (currentUser === 'ADMIN') { currentUser = null; localStorage.removeItem('flota_user'); } // sesión admin vieja sin token
+
+// Hide CRM tab for non-admin initially
+document.getElementById('tab_crm').style.display = 'none';
+
+// Mostrar modal de login con spinner mientras cargan los choferes
+if (!currentUser) {
+  document.getElementById('modal_login').style.display = 'block';
+  document.getElementById('login_loading').style.display = 'block';
+  document.getElementById('login_list').innerHTML = '';
+}
+
+initSession();
+</script>
+</body>
+</html>
