@@ -132,8 +132,8 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
   <button class="nav-tab" id="tab_crm" onclick="showPage('crm',this)"><span class="ti">🏠</span>Inicio</button>
   <button class="nav-tab" id="tab_datos" onclick="showPage('datos',this)"><span class="ti">📡</span>Datos</button>
   <button class="nav-tab active" id="tab_registro" onclick="showPage('registro',this)"><span class="ti">📋</span>Registro</button>
-  <button class="nav-tab" onclick="showPage('historial',this)"><span class="ti">📊</span>Historial</button>
-  <button class="nav-tab" onclick="showPage('enviar',this)"><span class="ti">📤</span>Enviar</button>
+  <button class="nav-tab" id="tab_historial" onclick="showPage('historial',this)"><span class="ti">📊</span>Historial</button>
+  <button class="nav-tab" id="tab_enviar" onclick="showPage('enviar',this)"><span class="ti">📤</span>Enviar</button>
 </div>
 
 <!-- ===== DATOS SHEETS ===== -->
@@ -535,6 +535,7 @@ function showPage(name, tabEl) {
   if (name === 'historial') { renderHistorial(); loadHistorial(); }
   if (name === 'enviar') updateSendCount();
   if (name === 'crm') { renderCRM(); loadChoferes(true); } // refresca al entrar al panel
+  if (name === 'datos') loadSheetData(); // antes había que tocar 🔄 para ver algo
 }
 
 // ---- SESSION ----
@@ -621,12 +622,17 @@ function applySession() {
     document.getElementById('header_user').textContent = '👑 Admin';
     document.getElementById('tab_crm').style.display = 'flex';
     document.getElementById('tab_datos').style.display = 'flex';
+    // El admin no carga ni envía registros: esas pestañas solo las ven los choferes
+    document.getElementById('tab_registro').style.display = 'none';
+    document.getElementById('tab_enviar').style.display = 'none';
     showPage('crm', document.getElementById('tab_crm'));
   } else {
     renderChoferSelect();
     document.getElementById('header_user').textContent = currentUser;
     document.getElementById('tab_crm').style.display = 'none';
     document.getElementById('tab_datos').style.display = 'none';
+    document.getElementById('tab_registro').style.display = 'flex';
+    document.getElementById('tab_enviar').style.display = 'flex';
     showPage('registro', document.getElementById('tab_registro'));
   }
   document.getElementById('btn_logout').style.display = 'inline-block';
@@ -933,13 +939,34 @@ function resetForm() {
 // Antes salía solo de los registros del móvil y se vaciaba al enviar/borrar.
 // Ahora sale de Google Sheets (lo enviado nunca se pierde) + lo que falta enviar.
 let historialRows = [];
+let historialJornadas = [];
 
 function historialKey() { return 'flota_historial_' + (isAdmin ? 'ADMIN' : currentUser); }
 
+// Jornada de la hoja JORNADAS → datos que usa la app (km recorridos, fotos)
+function normJornada(r) {
+  const ini = Number(r['KM_INICIO']) || 0, fin = Number(r['KM_FIN']) || 0;
+  return {
+    chofer: String(r['CHOFER'] || ''),
+    fecha: String(r['FECHA'] || ''),
+    mes: String(r['MES'] || '').toUpperCase(),
+    semana: String(r['SEMANA'] || ''),
+    kmIni: ini, kmFin: fin, km: fin > ini && ini ? fin - ini : 0,
+    fotos: Number(r['FOTOS']) || 0,
+    carpeta: String(r['CARPETA_FOTOS'] || ''),
+    nota: String(r['NOTA'] || ''),
+    registros: Number(r['REGISTROS']) || 0
+  };
+}
+
 // Última copia descargada, para verla sin conexión
 function loadHistorialCache() {
-  try { historialRows = JSON.parse(localStorage.getItem(historialKey()) || '[]'); }
-  catch(e) { historialRows = []; }
+  try {
+    const c = JSON.parse(localStorage.getItem(historialKey()) || '{}');
+    // (versiones anteriores guardaban solo la lista de registros)
+    historialRows = Array.isArray(c) ? c : (c.rows || []);
+    historialJornadas = Array.isArray(c) ? [] : (c.jornadas || []);
+  } catch(e) { historialRows = []; historialJornadas = []; }
 }
 
 async function loadHistorial() {
@@ -964,7 +991,8 @@ async function loadHistorial() {
       tipo: String(r['TIPO'] || ''),
       importe: parseFloat(r['IMPORTE']) || 0
     }));
-    try { localStorage.setItem(historialKey(), JSON.stringify(historialRows)); } catch(e) {}
+    historialJornadas = (json.jornadas || []).map(normJornada);
+    try { localStorage.setItem(historialKey(), JSON.stringify({ rows: historialRows, jornadas: historialJornadas })); } catch(e) {}
     info.textContent = 'Todo lo enviado queda guardado en Google Sheets.';
   } catch(e) {
     loadHistorialCache();
@@ -984,27 +1012,29 @@ function renderHistorial() {
   const enviadosIds = new Set(historialRows.map(r => r.id));
   const pendientes = myRecords().filter(r => !enviadosIds.has(String(r.id)))
     .map(r => ({ ...r, importe: Number(r.importe) || 0, pendiente: true }));
-  const filtered = historialRows.concat(pendientes).filter(r =>
-    (!userFilter || r.chofer===userFilter) && (!filtMes || r.mes===filtMes)
-  );
+  const filtro = r => (!userFilter || r.chofer===userFilter) && (!filtMes || r.mes===filtMes);
+  const filtered = historialRows.concat(pendientes).filter(filtro);
+  const jornadas = historialJornadas.filter(filtro);
   const el = document.getElementById('historial_content');
-  if (!filtered.length) { el.innerHTML='<div class="empty-msg">Sin registros.</div>'; return; }
+  if (!filtered.length && !jornadas.length) { el.innerHTML='<div class="empty-msg">Sin datos enviados todavía.</div>'; return; }
+  // Semanas con registros y/o jornadas (un día de "solo km" también aparece)
   const bySemana = {};
-  filtered.forEach(r => {
-    const key = `${r.mes} - Semana ${r.semana}`;
-    if (!bySemana[key]) bySemana[key]=[];
-    bySemana[key].push(r);
-  });
+  const semana = key => bySemana[key] || (bySemana[key] = { recs: [], jors: [] });
+  filtered.forEach(r => semana(`${r.mes} - Semana ${r.semana}`).recs.push(r));
+  jornadas.forEach(j => semana(`${j.mes} - Semana ${j.semana}`).jors.push(j));
   // Lo más reciente primero
   const orden = k => { const [m, s] = k.split(' - Semana '); return MES_ORDEN.indexOf(m) * 10 + (Number(s) || 0); };
-  el.innerHTML = Object.entries(bySemana).sort((a,b) => orden(b[0]) - orden(a[0])).map(([key,recs])=>{
+  el.innerHTML = Object.entries(bySemana).sort((a,b) => orden(b[0]) - orden(a[0])).map(([key,{recs,jors}])=>{
     const tP=recs.filter(r=>String(r.tipo).startsWith('privado')).reduce((s,r)=>s+r.importe,0);
     const tD=recs.filter(r=>r.tipo==='datafono').reduce((s,r)=>s+r.importe,0);
     const tG=recs.filter(r=>['peaje','parking','pinchazo'].includes(r.tipo)).reduce((s,r)=>s+r.importe,0);
     const tot=recs.reduce((s,r)=>s+r.importe,0);
     const pend=recs.filter(r=>r.pendiente).length;
+    const km=jors.reduce((s,j)=>s+j.km,0);
+    const dias=new Set(jors.map(j=>j.chofer+'|'+j.fecha)).size;
     return `<div class="hist-card">
       <div class="hist-title">📅 ${esc(key)} · ${recs.length} registros${pend ? `<span class="hist-pend">⏳ ${pend} sin enviar</span>` : ''}</div>
+      <div class="hist-stat"><span>🛣️ Km recorridos:</span><span>${km} km${dias ? ' · ' + dias + (dias === 1 ? ' día' : ' días') : ''}</span></div>
       <div class="hist-stat"><span>💵 Privados:</span><span>${tP.toFixed(2)} €</span></div>
       <div class="hist-stat"><span>💳 Datáfono:</span><span>${tD.toFixed(2)} €</span></div>
       <div class="hist-stat"><span>🚗 Gastos:</span><span>${tG.toFixed(2)} €</span></div>
@@ -1243,6 +1273,7 @@ function showToast(msg) {
 
 // ---- DATOS SHEETS ----
 let sheetData = [];
+let sheetJornadas = [];
 
 async function loadSheetData() {
   document.getElementById('datos_list').innerHTML = '<div class="empty-msg">⏳ Cargando...</div>';
@@ -1251,14 +1282,15 @@ async function loadSheetData() {
     const json = await res.json();
     if (json.status === 'ok') {
       sheetData = json.rows || [];
+      sheetJornadas = (json.jornadas || []).map(normJornada);
       // Populate chofer filter
-      const choferesList = [...new Set(sheetData.map(r => r['CHOFER']).filter(Boolean))].sort();
+      const choferesList = [...new Set(sheetData.map(r => r['CHOFER']).concat(sheetJornadas.map(j => j.chofer)).filter(Boolean))].sort();
       const sel = document.getElementById('datos_filtro_chofer');
       const cur = sel.value;
       sel.innerHTML = '<option value="">Todos los choferes</option>' +
         choferesList.map(c => `<option value="${esc(c)}" ${c===cur?'selected':''}>${esc(c)}</option>`).join('');
       renderSheetData();
-      showToast('✅ ' + sheetData.length + ' registros cargados');
+      showToast('✅ ' + sheetData.length + ' registros y ' + sheetJornadas.length + ' jornadas');
     } else {
       document.getElementById('datos_list').innerHTML = json.message === 'No autorizado'
         ? '<div class="empty-msg">🔒 Sesión de admin vencida — tocá 🔄 Cambiar y volvé a entrar con el PIN</div>'
@@ -1278,11 +1310,13 @@ function renderSheetData() {
     (!filtChofer || r['CHOFER'] === filtChofer) &&
     (!filtMes || String(r['MES']).toUpperCase() === filtMes)
   );
+  const jornadas = sheetJornadas.filter(j =>
+    (!filtChofer || j.chofer === filtChofer) && (!filtMes || j.mes === filtMes)
+  );
 
   // Stats
   const totalImporte = filtered.reduce((s,r) => s + (parseFloat(r['IMPORTE'])||0), 0);
-  const privados = filtered.filter(r => String(r['TIPO']||'').toLowerCase().includes('privado'));
-  const totalPriv = privados.reduce((s,r) => s + (parseFloat(r['IMPORTE'])||0), 0);
+  const totalKm = jornadas.reduce((s,j) => s + j.km, 0);
   document.getElementById('datos_stats').innerHTML = `
     <div class="cs" style="background:#f0f7ff;border-radius:8px;padding:10px;text-align:center">
       <div class="cv" style="font-size:15px;font-weight:800;color:#1B2838">${filtered.length}</div>
@@ -1293,25 +1327,39 @@ function renderSheetData() {
       <div class="cl" style="font-size:10px;color:#888;margin-top:2px">Total</div>
     </div>
     <div class="cs" style="background:#fff8f0;border-radius:8px;padding:10px;text-align:center">
-      <div class="cv" style="font-size:15px;font-weight:800;color:#1B2838">${totalPriv.toFixed(0)}€</div>
-      <div class="cl" style="font-size:10px;color:#888;margin-top:2px">Privados</div>
+      <div class="cv" style="font-size:15px;font-weight:800;color:#1B2838">${totalKm}</div>
+      <div class="cl" style="font-size:10px;color:#888;margin-top:2px">Km</div>
     </div>`;
 
-  if (!filtered.length) {
+  if (!filtered.length && !jornadas.length) {
     document.getElementById('datos_list').innerHTML = '<div class="empty-msg">Sin datos para este filtro</div>';
     return;
   }
 
-  // Group by chofer if showing all
+  // Agrupado por chofer: jornadas (km, fotos) y registros, lo más nuevo primero
   const grouped = {};
-  filtered.forEach(r => {
-    const key = r['CHOFER'] || 'Sin chofer';
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(r);
-  });
+  const grupo = k => grouped[k] || (grouped[k] = { rows: [], jors: [] });
+  filtered.forEach(r => grupo(r['CHOFER'] || 'Sin chofer').rows.push(r));
+  jornadas.forEach(j => grupo(j.chofer || 'Sin chofer').jors.push(j));
 
-  document.getElementById('datos_list').innerHTML = Object.entries(grouped).map(([chofer, rows]) => {
+  const jornadaHtml = j => `
+      <div style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:12px;background:#f8fbff">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700;color:#1B2838">🛣️ Jornada ${esc(j.fecha)}</span>
+          <span style="font-weight:700;color:#2980B9">${j.km ? j.km + ' km' : 'sin km'}</span>
+        </div>
+        <div style="color:#aaa;margin-top:2px">
+          ${j.kmIni || j.kmFin ? esc(j.kmIni) + ' → ' + esc(j.kmFin) : ''}
+          ${j.registros ? ' · ' + j.registros + ' registros' : ' · sin registros'}
+          ${j.fotos ? ` · 📷 ${j.fotos} foto${j.fotos === 1 ? '' : 's'}${j.carpeta ? ` <a href="${esc(j.carpeta)}" target="_blank" style="color:#2980B9;font-weight:700">Ver</a>` : ''}` : ''}
+          ${j.nota ? '<br><em>' + esc(j.nota) + '</em>' : ''}
+        </div>
+      </div>`;
+
+  document.getElementById('datos_list').innerHTML = Object.entries(grouped).map(([chofer, { rows, jors }]) => {
     const tot = rows.reduce((s,r)=>s+(parseFloat(r['IMPORTE'])||0),0);
+    const km = jors.reduce((s,j)=>s+j.km,0);
+    const jorsHtml = jors.slice().sort((a,b) => b.fecha.localeCompare(a.fecha)).map(jornadaHtml).join('');
     const rowsHtml = rows.slice().reverse().map(r => `
       <div style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:12px">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1330,8 +1378,9 @@ function renderSheetData() {
     return `<div style="border:1.5px solid #e0eaf4;border-radius:10px;overflow:hidden;margin-bottom:10px">
       <div style="background:#1B2838;color:white;padding:10px 12px;display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700;font-size:13px">👤 ${esc(chofer)}</span>
-        <span style="font-size:12px;opacity:0.8">${rows.length} reg · ${tot.toFixed(2)} €</span>
+        <span style="font-size:12px;opacity:0.8">${rows.length} reg · ${tot.toFixed(2)} € · ${km} km</span>
       </div>
+      ${jorsHtml}
       ${rowsHtml}
     </div>`;
   }).join('');
