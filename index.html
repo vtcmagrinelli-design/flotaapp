@@ -693,19 +693,14 @@ async function logout() {
 
 // ---- CRM ----
 function renderCRM() {
+  // Solo datos de choferes: los importes y registros reales están en la pestaña Datos
+  // (antes se mostraban registros del teléfono del admin, que siempre daban 0)
   const activos = choferes.filter(c=>c.estado==='activo').length;
-  const totalRec = records.length;
-  const totalEfvo = records.filter(r=>r.tipo==='privado_efvo').reduce((s,r)=>s+r.importe,0);
   document.getElementById('crm_stats').innerHTML = `
     <div class="stat-box"><div class="sv">${activos}</div><div class="sl">Choferes activos</div></div>
-    <div class="stat-box"><div class="sv">${totalRec}</div><div class="sl">Registros totales</div></div>
-    <div class="stat-box"><div class="sv">${totalEfvo.toFixed(0)}€</div><div class="sl">Efvo pendiente</div></div>
     <div class="stat-box"><div class="sv">${choferes.length}</div><div class="sl">Choferes totales</div></div>`;
 
   document.getElementById('crm_choferes_list').innerHTML = choferes.map((c,i) => {
-    const myRecs = records.filter(r=>r.chofer===c.name);
-    const total = myRecs.reduce((s,r)=>s+r.importe,0);
-    const privados = myRecs.filter(r=>r.tipo.startsWith('privado')).reduce((s,r)=>s+r.importe,0);
     const color = AVATAR_COLORS[i % AVATAR_COLORS.length];
     return `<div class="chofer-card">
       <div class="chofer-card-header">
@@ -716,17 +711,12 @@ function renderCRM() {
             <span class="chofer-status status-${esc(c.estado)}">${esc(c.estado)}</span>
             ${c.vinculado
               ? '<span class="chofer-status" style="background:#EBF5FB;color:#2980B9">📱 Vinculado</span>'
-              : '<span class="chofer-status" style="background:#f0f0f0;color:#888">Sin teléfono</span>'}
+              : '<span class="chofer-status" style="background:#f0f0f0;color:#888">Sin vincular</span>'}
           </div>
           <div style="font-size:11px;color:#aaa;margin-top:2px">
-            ${esc(c.telefono||'Sin teléfono')} · ${esc(c.vehiculo||'Sin vehículo')}
+            ${esc(c.telefono||'Sin número')} · ${esc(c.vehiculo||'Sin vehículo')}
           </div>
         </div>
-      </div>
-      <div class="chofer-stats">
-        <div class="cs"><div class="cv">${myRecs.length}</div><div class="cl">Registros</div></div>
-        <div class="cs"><div class="cv">${total.toFixed(0)}€</div><div class="cl">Total</div></div>
-        <div class="cs"><div class="cv">${privados.toFixed(0)}€</div><div class="cl">Privados</div></div>
       </div>
       <div class="chofer-actions">
         <button class="btn-sm btn-edit" onclick="editChofer(${i})">✏️ Editar</button>
