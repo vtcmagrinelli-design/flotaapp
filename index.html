@@ -160,7 +160,16 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
     <!-- Stats resumen -->
     <div id="datos_stats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px"></div>
     <!-- Lista -->
-    <div id="datos_list"><div class="empty-msg">Pulsa 🔄 para cargar datos</div></div>
+    <!-- Barra de borrado: aparece al marcar registros o jornadas -->
+    <div id="datos_sel_bar" style="display:none;position:sticky;top:58px;z-index:50;background:#FADBD8;border-radius:10px;padding:10px 12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
+      <span style="font-size:13px;font-weight:700;color:#C0392B" id="datos_sel_count"></span>
+      <div style="display:flex;gap:6px">
+        <button onclick="clearSeleccion()" style="background:white;color:#888;border:none;border-radius:8px;padding:8px 10px;font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>
+        <button onclick="borrarSeleccionados()" style="background:#C0392B;color:white;border:none;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer">🗑️ Borrar</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#aaa;margin-bottom:8px">Marcá la casilla de lo que quieras borrar (por ejemplo, registros de prueba).</div>
+    <div id="datos_list"><div class="empty-msg">⏳ Cargando...</div></div>
   </div>
 </div>
 </div>
@@ -622,8 +631,9 @@ function applySession() {
     document.getElementById('header_user').textContent = '👑 Admin';
     document.getElementById('tab_crm').style.display = 'flex';
     document.getElementById('tab_datos').style.display = 'flex';
-    // El admin no carga ni envía registros: esas pestañas solo las ven los choferes
+    // El admin no carga ni envía registros, y todo lo enviado lo ve en Datos: esas pestañas son de los choferes
     document.getElementById('tab_registro').style.display = 'none';
+    document.getElementById('tab_historial').style.display = 'none';
     document.getElementById('tab_enviar').style.display = 'none';
     showPage('crm', document.getElementById('tab_crm'));
   } else {
@@ -632,6 +642,7 @@ function applySession() {
     document.getElementById('tab_crm').style.display = 'none';
     document.getElementById('tab_datos').style.display = 'none';
     document.getElementById('tab_registro').style.display = 'flex';
+    document.getElementById('tab_historial').style.display = 'flex';
     document.getElementById('tab_enviar').style.display = 'flex';
     showPage('registro', document.getElementById('tab_registro'));
   }
@@ -947,6 +958,7 @@ function historialKey() { return 'flota_historial_' + (isAdmin ? 'ADMIN' : curre
 function normJornada(r) {
   const ini = Number(r['KM_INICIO']) || 0, fin = Number(r['KM_FIN']) || 0;
   return {
+    enviado: String(r['ENVIADO_EN'] || ''), // identifica la jornada para poder borrarla
     chofer: String(r['CHOFER'] || ''),
     fecha: String(r['FECHA'] || ''),
     mes: String(r['MES'] || '').toUpperCase(),
@@ -1275,6 +1287,55 @@ function showToast(msg) {
 let sheetData = [];
 let sheetJornadas = [];
 
+// ---- Selección para borrar (admin) ----
+// Claves: "r:<ID>" para registros, "j:<ENVIADO_EN>|<CHOFER>" para jornadas
+const datosSel = new Set();
+
+function selBox(key) {
+  return `<input type="checkbox" data-key="${esc(key)}" ${datosSel.has(key) ? 'checked' : ''}
+    onchange="toggleSel(this.dataset.key, this.checked)" style="margin-top:2px;accent-color:#C0392B">`;
+}
+
+function toggleSel(key, on) {
+  if (on) datosSel.add(key); else datosSel.delete(key);
+  updateSelBar();
+}
+
+function clearSeleccion() {
+  datosSel.clear();
+  document.querySelectorAll('#datos_list input[type=checkbox]').forEach(c => { c.checked = false; });
+  updateSelBar();
+}
+
+function updateSelBar() {
+  const bar = document.getElementById('datos_sel_bar');
+  bar.style.display = datosSel.size ? 'flex' : 'none';
+  document.getElementById('datos_sel_count').textContent = datosSel.size + ' seleccionado' + (datosSel.size === 1 ? '' : 's');
+}
+
+async function borrarSeleccionados() {
+  const keys = [...datosSel];
+  const ids = keys.filter(k => k.startsWith('r:')).map(k => k.slice(2));
+  const jornadas = keys.filter(k => k.startsWith('j:')).map(k => {
+    const s = k.slice(2), i = s.lastIndexOf('|');
+    return { enviado: s.slice(0, i), chofer: s.slice(i + 1) };
+  });
+  const partes = [];
+  if (ids.length) partes.push(ids.length + ' registro' + (ids.length === 1 ? '' : 's'));
+  if (jornadas.length) partes.push(jornadas.length + ' jornada' + (jornadas.length === 1 ? '' : 's'));
+  if (!confirm('¿Borrar ' + partes.join(' y ') + ' de Google Sheets?\n\nNo se puede deshacer.')) return;
+  showToast('⏳ Borrando...');
+  try {
+    const json = await postToScript({ action: 'deleteDatos', token: adminToken, ids, jornadas });
+    if (json.action !== 'deleted') throw new Error('El Apps Script publicado está desactualizado');
+    datosSel.clear(); updateSelBar();
+    showToast('🗑️ Borrados: ' + json.registros + ' registros, ' + json.jornadas + ' jornadas');
+    loadSheetData();
+  } catch(e) {
+    alert('❌ No se pudo borrar: ' + e.message);
+  }
+}
+
 async function loadSheetData() {
   document.getElementById('datos_list').innerHTML = '<div class="empty-msg">⏳ Cargando...</div>';
   try {
@@ -1343,7 +1404,9 @@ function renderSheetData() {
   jornadas.forEach(j => grupo(j.chofer || 'Sin chofer').jors.push(j));
 
   const jornadaHtml = j => `
-      <div style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:12px;background:#f8fbff">
+      <div style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:12px;background:#f8fbff;display:flex;gap:8px;align-items:flex-start">
+        ${selBox('j:' + j.enviado + '|' + j.chofer)}
+        <div style="flex:1;min-width:0">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:700;color:#1B2838">🛣️ Jornada ${esc(j.fecha)}</span>
           <span style="font-weight:700;color:#2980B9">${j.km ? j.km + ' km' : 'sin km'}</span>
@@ -1354,6 +1417,7 @@ function renderSheetData() {
           ${j.fotos ? ` · 📷 ${j.fotos} foto${j.fotos === 1 ? '' : 's'}${j.carpeta ? ` <a href="${esc(j.carpeta)}" target="_blank" style="color:#2980B9;font-weight:700">Ver</a>` : ''}` : ''}
           ${j.nota ? '<br><em>' + esc(j.nota) + '</em>' : ''}
         </div>
+        </div>
       </div>`;
 
   document.getElementById('datos_list').innerHTML = Object.entries(grouped).map(([chofer, { rows, jors }]) => {
@@ -1361,7 +1425,9 @@ function renderSheetData() {
     const km = jors.reduce((s,j)=>s+j.km,0);
     const jorsHtml = jors.slice().sort((a,b) => b.fecha.localeCompare(a.fecha)).map(jornadaHtml).join('');
     const rowsHtml = rows.slice().reverse().map(r => `
-      <div style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:12px">
+      <div style="padding:8px;border-bottom:1px solid #f0f0f0;font-size:12px;display:flex;gap:8px;align-items:flex-start">
+        ${selBox('r:' + r['ID'])}
+        <div style="flex:1;min-width:0">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-weight:700;color:#2980B9">${esc(r['TIPO_LABEL']||r['TIPO']||'-')}</span>
           <span style="font-weight:700;color:#27AE60">${(parseFloat(r['IMPORTE'])||0).toFixed(2)} €</span>
@@ -1372,6 +1438,7 @@ function renderSheetData() {
           ${r['HORA_INICIO'] ? ' · '+esc(r['HORA_INICIO'])+(r['HORA_FIN']?'-'+esc(r['HORA_FIN']):'') : ''}
           ${r['KM_INICIO']||r['KM_FIN'] ? ' · '+esc(r['KM_INICIO'])+'-'+esc(r['KM_FIN'])+' km' : ''}
           ${r['OBSERVACIONES'] ? '<br><em>'+esc(r['OBSERVACIONES'])+'</em>' : ''}
+        </div>
         </div>
       </div>`).join('');
 
