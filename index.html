@@ -372,15 +372,31 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
       <label>Estado</label>
       <select id="edit_estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select>
     </div>
-    <div class="form-group" id="edit_liberar_box">
-      <label>Teléfono vinculado</label>
-      <div id="edit_liberar_info" style="font-size:12px;color:#888;margin-bottom:6px"></div>
+    <div class="form-group" id="edit_pin_box">
+      <label>PIN del chofer</label>
+      <div id="edit_pin_info" style="font-size:12px;color:#888;margin-bottom:6px"></div>
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#C0392B;letter-spacing:0">
-        <input id="edit_liberar" type="checkbox" style="width:auto"> 🔓 Liberar teléfono (para que entre desde otro)
+        <input id="edit_reset_pin" type="checkbox"> 🔄 Borrar PIN (por si se lo olvidó: crea uno nuevo al entrar)
       </label>
     </div>
     <input type="hidden" id="edit_index">
     <button class="btn-primary" onclick="saveChofer()" style="margin-top:6px">💾 Guardar</button>
+  </div>
+</div>
+
+<!-- MODAL PIN (4 números, ocultos, teclado numérico) -->
+<div id="modal_pin" class="modal-overlay" style="z-index:700">
+  <div style="background:white;border-radius:16px;max-width:320px;margin:120px auto 0;padding:22px;text-align:center">
+    <div style="font-size:34px;margin-bottom:6px">🔒</div>
+    <h2 id="pin_title" style="font-size:16px;color:#1B2838;margin-bottom:6px"></h2>
+    <p id="pin_sub" style="font-size:12px;color:#888;margin-bottom:14px"></p>
+    <input id="pin_input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"
+      style="text-align:center;font-size:28px;letter-spacing:14px;padding:10px" placeholder="••••">
+    <div id="pin_error" style="font-size:12px;color:#C0392B;min-height:18px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="pin_cancel" style="flex:1;padding:12px;border:none;border-radius:10px;background:#f0f0f0;color:#666;font-weight:700;font-size:14px;cursor:pointer">Cancelar</button>
+      <button id="pin_ok" style="flex:1;padding:12px;border:none;border-radius:10px;background:#2980B9;color:white;font-weight:700;font-size:14px;cursor:pointer">Aceptar</button>
+    </div>
   </div>
 </div>
 
@@ -390,7 +406,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-05.1';
+const APP_VERSION = '2026-10-05.2';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -512,7 +528,7 @@ async function syncChofer(action, data) {
         telefono: data.telefono || '',
         vehiculo: data.vehiculo || '',
         estado:   data.estado   || 'activo',
-        liberar:  !!data.liberar
+        resetPin: !!data.resetPin
       }
     });
     // Un Apps Script viejo no conoce estas acciones: guarda un registro vacío y responde sin "action"
@@ -571,20 +587,27 @@ function showPage(name, tabEl) {
 async function initSession() {
   // Carga choferes desde Sheets (con fallback a caché local)
   await loadChoferes();
-  // Chofer que ya estaba adentro antes de esta versión: se vincula este teléfono sin pedirle nada
-  if (currentUser && !isAdmin && !choferToken) {
-    try {
-      const json = await postToScript({ action: 'loginChofer', name: currentUser, device: deviceId });
-      if (json.token) { choferToken = json.token; localStorage.setItem('flota_chofer_token', json.token); }
-    } catch(e) {
-      if (e.message !== 'Failed to fetch') {   // otro teléfono ya tiene este perfil
-        alert('❌ ' + e.message);
-        currentUser = null; localStorage.removeItem('flota_user');
-      }
-    }
+  const yo = currentUser && !isAdmin && choferesLoaded ? choferes.find(c => c.name === currentUser) : null;
+  if (yo && yo.tienePin === false) {
+    // Chofer que ya estaba adentro (versión sin PIN): crea su PIN una vez, desde su mismo teléfono
+    const token = await entrarConPin(currentUser,
+      'Ahora la app usa un PIN de 4 números para proteger tu perfil. Crealo una sola vez.');
+    if (token) guardarSesionChofer(currentUser, token);
+  } else if (yo && !choferToken) {
+    // Sin sesión guardada: tiene que ingresar su PIN
+    const token = await entrarConPin(currentUser);
+    if (token) guardarSesionChofer(currentUser, token);
+    else { currentUser = null; localStorage.removeItem('flota_user'); }
   }
   if (currentUser) { applySession(); }
   else { showLoginModal(); }
+}
+
+function guardarSesionChofer(name, token) {
+  choferToken = token;
+  currentUser = name; isAdmin = false;
+  localStorage.setItem('flota_user', name);
+  localStorage.setItem('flota_chofer_token', token);
 }
 
 function showLoginModal() {
@@ -600,44 +623,88 @@ function showLoginModal() {
              font-weight:700;color:white;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">
       <span style="background:${AVATAR_COLORS[i%AVATAR_COLORS.length]};width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px">${esc(c.name[0])}</span>
       <span style="flex:1">${esc(c.name)}</span>
-      <span style="font-size:12px;opacity:0.5">${c.vinculado ? '📱' : ''}</span>
+      <span style="font-size:12px;opacity:0.5">${c.tienePin ? '🔒' : ''}</span>
     </button>`).join('');
 }
 
-// Vincula el chofer a este teléfono en el servidor; devuelve el token o null
-async function vincularChofer(name, silent) {
-  try {
-    const json = await postToScript({ action: 'loginChofer', name, device: deviceId });
-    if (!json.token) throw new Error('El Apps Script publicado está desactualizado');
-    return json.token;
-  } catch(e) {
-    if (!silent) alert('❌ ' + (e.message === 'Failed to fetch' ? 'Sin conexión — conectate a internet para entrar la primera vez' : e.message));
-    return null;
+// Ventana para escribir un PIN de 4 números → devuelve el PIN o null si se cancela
+function askPin(title, sub, error) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('modal_pin');
+    const input = document.getElementById('pin_input');
+    document.getElementById('pin_title').textContent = title;
+    document.getElementById('pin_sub').textContent = sub || '';
+    document.getElementById('pin_error').textContent = error || '';
+    input.value = '';
+    modal.style.display = 'block';
+    setTimeout(() => input.focus(), 50);
+    const cerrar = val => {
+      modal.style.display = 'none';
+      document.getElementById('pin_ok').onclick = document.getElementById('pin_cancel').onclick = input.onkeydown = null;
+      resolve(val);
+    };
+    const aceptar = () => {
+      const v = input.value.trim();
+      if (!/^\d{4}$/.test(v)) { document.getElementById('pin_error').textContent = 'Tienen que ser 4 números'; return; }
+      cerrar(v);
+    };
+    document.getElementById('pin_ok').onclick = aceptar;
+    document.getElementById('pin_cancel').onclick = () => cerrar(null);
+    input.onkeydown = e => { if (e.key === 'Enter') aceptar(); };
+  });
+}
+
+// Pide el PIN del chofer (o se lo hace crear si todavía no tiene) y lo valida en el servidor.
+// Devuelve el token, o null si se cancela.
+async function entrarConPin(name, mensaje) {
+  const c = choferes.find(x => x.name === name);
+  const crear = c && c.tienePin === false;
+  let error = '';
+  while (true) {
+    let pin;
+    if (crear) {
+      const p1 = await askPin('Creá tu PIN, ' + name, mensaje || '4 números. Lo vas a usar para entrar a la app. No se lo digas a nadie.', error);
+      if (p1 === null) return null;
+      const p2 = await askPin('Repetí tu PIN', 'Escribilo otra vez para confirmar');
+      if (p2 === null) return null;
+      if (p1 !== p2) { error = 'Los dos PIN no coinciden. Probá de nuevo.'; continue; }
+      pin = p1;
+    } else {
+      pin = await askPin('PIN de ' + name, mensaje || 'Ingresá tu PIN de 4 números', error);
+      if (pin === null) return null;
+    }
+    showToast('⏳ Verificando...');
+    try {
+      const json = await postToScript({ action: 'loginChofer', name, pin, nuevo: crear, device: deviceId });
+      if (!json.token) throw new Error('El Apps Script publicado está desactualizado');
+      if (c) c.tienePin = true;
+      return json.token;
+    } catch(e) {
+      if (e.message === 'Failed to fetch') { alert('❌ Sin conexión — conectate a internet para entrar.'); return null; }
+      // PIN incorrecto: se vuelve a pedir. Otros errores (bloqueo, otro teléfono): se avisa y se corta.
+      if (e.message === 'PIN incorrecto') { error = '❌ PIN incorrecto'; continue; }
+      alert('❌ ' + e.message);
+      return null;
+    }
   }
 }
 
-// Sin PIN: el chofer elige su nombre UNA vez y este teléfono queda fijo en su perfil.
-// Desde otro teléfono no se puede entrar con ese nombre (el servidor lo rechaza).
+// Cada chofer entra con su PIN de 4 números (lo crea la primera vez). Después queda dentro de su perfil.
 async function loginAs(name) {
-  if (!confirm('¿Sos ' + name + '?\n\nEste teléfono va a quedar fijo en tu perfil. Para cambiarlo hace falta el administrador.')) return;
-  showToast('⏳ Entrando...');
-  const token = await vincularChofer(name);
+  const token = await entrarConPin(name);
   if (!token) return;
-  choferToken = token;
-  currentUser = name; isAdmin = false;
-  localStorage.setItem('flota_user', name);
-  localStorage.setItem('flota_chofer_token', token);
+  guardarSesionChofer(name, token);
   document.getElementById('modal_login').style.display = 'none';
   applySession();
   showToast('👋 Bienvenido, ' + name + '!');
 }
 
-// Si el token dejó de valer (p. ej. el admin liberó el teléfono), se vuelve a vincular en silencio
+// Si la sesión dejó de valer (p. ej. el admin borró el PIN), se vuelve a pedir el PIN
 async function reauthChofer() {
-  const token = await vincularChofer(currentUser, true);
+  await loadChoferes(true); // para saber si tiene que crear un PIN nuevo
+  const token = await entrarConPin(currentUser, 'Tu sesión venció. Ingresá tu PIN para seguir.');
   if (!token) return false;
-  choferToken = token;
-  localStorage.setItem('flota_chofer_token', token);
+  guardarSesionChofer(currentUser, token);
   return true;
 }
 
@@ -729,9 +796,9 @@ function renderCRM() {
           <div style="display:flex;align-items:center;gap:7px">
             <div class="chofer-name">${esc(c.name)}</div>
             <span class="chofer-status status-${esc(c.estado)}">${esc(c.estado)}</span>
-            ${c.vinculado
-              ? '<span class="chofer-status" style="background:#EBF5FB;color:#2980B9">📱 Vinculado</span>'
-              : '<span class="chofer-status" style="background:#f0f0f0;color:#888">Sin vincular</span>'}
+            ${c.tienePin
+              ? '<span class="chofer-status" style="background:#EBF5FB;color:#2980B9">🔒 Con PIN</span>'
+              : '<span class="chofer-status" style="background:#f0f0f0;color:#888">Sin PIN</span>'}
           </div>
           <div style="font-size:11px;color:#aaa;margin-top:2px">
             ${esc(c.telefono||'Sin número')} · ${esc(c.vehiculo||'Sin vehículo')}
@@ -753,8 +820,8 @@ function openAddChofer() {
   document.getElementById('edit_telefono').value = '';
   document.getElementById('edit_vehiculo').value = '';
   document.getElementById('edit_estado').value = 'activo';
-  document.getElementById('edit_liberar_box').style.display = 'none'; // un chofer nuevo no tiene teléfono
-  document.getElementById('edit_liberar').checked = false;
+  document.getElementById('edit_pin_box').style.display = 'none'; // un chofer nuevo crea su PIN al entrar
+  document.getElementById('edit_reset_pin').checked = false;
   document.getElementById('edit_index').value = '-1';
   document.getElementById('modal_edit_chofer').style.display = 'block';
 }
@@ -766,10 +833,12 @@ function editChofer(i) {
   document.getElementById('edit_telefono').value = c.telefono || '';
   document.getElementById('edit_vehiculo').value = c.vehiculo || '';
   document.getElementById('edit_estado').value = c.estado || 'activo';
-  document.getElementById('edit_liberar_box').style.display = c.vinculado ? 'block' : 'none';
-  document.getElementById('edit_liberar_info').textContent =
-    '📱 ' + c.name + ' ya entró desde su teléfono. Nadie más puede usar este perfil.';
-  document.getElementById('edit_liberar').checked = false;
+  // Se puede borrar el PIN (o el teléfono vinculado de la versión anterior) para que cree uno nuevo
+  document.getElementById('edit_pin_box').style.display = (c.tienePin || c.vinculado) ? 'block' : 'none';
+  document.getElementById('edit_pin_info').textContent = c.tienePin
+    ? '🔒 ' + c.name + ' ya tiene su PIN. Nadie más puede entrar a su perfil.'
+    : '📱 Todavía no creó su PIN: lo va a crear la próxima vez que abra la app.';
+  document.getElementById('edit_reset_pin').checked = false;
   document.getElementById('edit_index').value = i;
   document.getElementById('modal_edit_chofer').style.display = 'block';
 }
@@ -782,14 +851,15 @@ async function saveChofer() {
   if (choferes.some((c,j) => j !== i && c.name.toUpperCase() === nombre)) {
     showToast('⚠️ Ya existe un chofer con ese nombre'); return;
   }
-  const liberar = i !== -1 && document.getElementById('edit_liberar').checked;
-  if (liberar && !confirm('¿Liberar el teléfono de ' + choferes[i].name + '?\n\nLa próxima vez podrá entrar desde un teléfono nuevo.')) return;
+  const resetPin = i !== -1 && document.getElementById('edit_reset_pin').checked;
+  if (resetPin && !confirm('¿Borrar el PIN de ' + choferes[i].name + '?\n\nLa próxima vez que abra la app va a crear uno nuevo.')) return;
   const obj = {
     name: nombre,
     telefono: document.getElementById('edit_telefono').value.trim(),
     vehiculo: document.getElementById('edit_vehiculo').value.trim(),
     estado: document.getElementById('edit_estado').value,
-    vinculado: i === -1 ? false : (liberar ? false : choferes[i].vinculado)
+    tienePin: i === -1 ? false : (resetPin ? false : choferes[i].tienePin),
+    vinculado: i === -1 ? false : (resetPin ? false : choferes[i].vinculado)
   };
   // Si se renombró, el servidor busca la fila por el nombre anterior (antes creaba un duplicado)
   const oldName = i === -1 ? '' : choferes[i].name;
@@ -802,8 +872,8 @@ async function saveChofer() {
   showToast('⏳ Guardando...');
 
   const action = i === -1 ? 'addChofer' : 'updateChofer';
-  const ok = await syncChofer(action, { ...obj, oldName, liberar });
-  showToast(ok ? (liberar ? '🔓 Teléfono liberado' : i === -1 ? '✅ Chofer agregado en todos los dispositivos' : '✅ Chofer actualizado en todos los dispositivos')
+  const ok = await syncChofer(action, { ...obj, oldName, resetPin });
+  showToast(ok ? (resetPin ? '🔄 PIN borrado: creará uno nuevo al entrar' : i === -1 ? '✅ Chofer agregado en todos los dispositivos' : '✅ Chofer actualizado en todos los dispositivos')
                 : '✅ Guardado localmente (sin conexión)');
   renderCRM();
   renderChoferSelect();
