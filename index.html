@@ -92,6 +92,13 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .hist-stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 1px solid #e0ecf8; }
 .hist-stat:last-child { border-bottom: none; font-weight: 700; }
 
+.foto-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.foto-grid:empty { display: none; }
+.foto-item { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #f0f0f0; }
+.foto-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto-item button { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: none; background: rgba(0,0,0,0.6); color: white; font-size: 13px; cursor: pointer; }
+.btn-foto { display: block; width: 100%; padding: 12px; border: 2px dashed #c8dff5; border-radius: 10px; background: #f8fbff; color: #2980B9; font-size: 14px; font-weight: 700; text-align: center; cursor: pointer; text-transform: none; letter-spacing: 0; margin: 0; }
+.btn-foto input { display: none; }
 .hist-pend { font-size: 11px; color: #e67e22; font-weight: 700; margin-left: 4px; }
 .hist-info { font-size: 11px; color: #aaa; margin-bottom: 10px; }
 
@@ -262,6 +269,16 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
     <div class="form-group"><label>Incidencias o notas</label><textarea id="nota_jornada" style="min-height:90px" placeholder="Ej: Pinchazo a las 14h, incidencia con pasajero..."></textarea></div>
     <button class="btn-primary" onclick="saveNota()">💾 Guardar Nota</button>
   </div>
+
+  <div class="card">
+    <h2>📷 Fotos <span style="font-size:11px;color:#aaa;font-weight:600">(opcional)</span></h2>
+    <div class="foto-grid" id="fotos_grid"></div>
+    <label class="btn-foto">
+      ➕ Agregar fotos
+      <input type="file" accept="image/*" multiple onchange="addFotos(this)">
+    </label>
+    <div style="font-size:11px;color:#aaa;margin-top:6px;text-align:center">Hasta <span id="fotos_max"></span> fotos. Se envían junto con la jornada.</div>
+  </div>
 </div>
 </div>
 
@@ -293,10 +310,16 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 <div class="container">
   <div class="card">
     <h2>📤 Enviar al Administrador</h2>
-    <p style="font-size:13px;color:#888;margin-bottom:14px">Los datos van directo a Google Sheets.</p>
+    <p style="font-size:13px;color:#888;margin-bottom:14px">Los datos van directo a Google Sheets. Si hoy no hubo registros, podés enviar solo los km.</p>
     <div style="background:#f0f7ff;border-radius:8px;padding:12px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;font-size:13px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
         <span style="color:#666">Registros pendientes:</span><strong id="send_count">0</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+        <span style="color:#666">Kilómetros:</span><strong id="send_km">-</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:13px">
+        <span style="color:#666">Fotos:</span><strong id="send_fotos">0</strong>
       </div>
     </div>
     <button class="btn-green" id="btn_enviar" onclick="shareJSON()">📤 Enviar Datos</button>
@@ -590,6 +613,7 @@ async function reauthChofer() {
 
 function applySession() {
   loadHistorialCache(); // historial del usuario que entra (no el del anterior)
+  renderRecords(); renderFotos(); updateSendCount(); // lo pendiente de ESTE usuario
   const sel = document.getElementById('chofer');
   if (isAdmin) {
     sel.disabled = false;
@@ -989,9 +1013,76 @@ function renderHistorial() {
   }).join('');
 }
 
+// ---- FOTOS (opcionales) ----
+const MAX_FOTOS = 6;
+let fotos = [];
+try { fotos = JSON.parse(localStorage.getItem('flota_fotos') || '[]'); } catch(e) { fotos = []; }
+
+function myFotos() { return isAdmin ? fotos : fotos.filter(f => f.chofer === currentUser); }
+
+// Reduce la foto (máx. 1280px, JPEG): una foto entera del móvil llenaría la memoria de la app
+function compressImage(file, maxSize = 1280, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Imagen no válida')); };
+    img.src = url;
+  });
+}
+
+function saveFotos() {
+  try { localStorage.setItem('flota_fotos', JSON.stringify(fotos)); return true; }
+  catch(e) { return false; }
+}
+
+async function addFotos(input) {
+  const files = [...input.files];
+  input.value = ''; // permite volver a elegir las mismas fotos
+  const libres = MAX_FOTOS - myFotos().length;
+  if (libres <= 0) { alert('📷 Máximo ' + MAX_FOTOS + ' fotos por envío.'); return; }
+  if (files.length > libres) alert('📷 Solo se agregan ' + libres + ' foto(s): el máximo es ' + MAX_FOTOS + '.');
+  showToast('⏳ Procesando fotos...');
+  let agregadas = 0;
+  for (const file of files.slice(0, libres)) {
+    try {
+      const data = await compressImage(file);
+      fotos.push({ id: Date.now() + '_' + Math.random().toString(36).slice(2, 7), chofer: currentUser, data });
+      if (!saveFotos()) { fotos.pop(); alert('❌ No hay más espacio en el teléfono para fotos. Enviá las que tenés primero.'); break; }
+      agregadas++;
+    } catch(e) { /* archivo que no es imagen: se ignora */ }
+  }
+  renderFotos(); updateSendCount();
+  if (agregadas) showToast('📷 ' + agregadas + ' foto(s) agregada(s)');
+}
+
+function deleteFoto(id) {
+  if (!confirm('¿Quitar esta foto?')) return;
+  fotos = fotos.filter(f => f.id !== id);
+  saveFotos(); renderFotos(); updateSendCount();
+}
+
+function renderFotos() {
+  document.getElementById('fotos_max').textContent = MAX_FOTOS;
+  document.getElementById('fotos_grid').innerHTML = myFotos().map(f => `
+    <div class="foto-item"><img src="${f.data}" alt="Foto"><button onclick="deleteFoto('${esc(f.id)}')">✕</button></div>`).join('');
+}
+
 // ---- ENVIAR ----
 function updateSendCount() {
   document.getElementById('send_count').textContent = myRecords().length;
+  document.getElementById('send_fotos').textContent = myFotos().length;
+  const ini = Number(document.getElementById('km_inicio').value) || 0;
+  const fin = Number(document.getElementById('km_fin').value) || 0;
+  document.getElementById('send_km').textContent = ini && fin ? (fin - ini) + ' km (' + ini + ' → ' + fin + ')' : 'sin completar';
 }
 
 let sending = false;
@@ -1004,14 +1095,22 @@ function getJornadasEnviadas() {
 
 async function shareJSON() {
   const mine = myRecords();
-  if (!mine.length) { showToast('⚠️ No hay registros'); return; }
+  const misFotos = myFotos();
   if (sending) return; // evita doble envío por doble toque
   // Km de inicio y fin obligatorios para calcular los km recorridos,
-  // salvo registros olvidados de un día cuya jornada (con km) ya se envió desde este teléfono
+  // salvo registros/fotos olvidados de un día cuya jornada (con km) ya se envió desde este teléfono
   const kmIni = Number(document.getElementById('km_inicio').value) || 0;
   const kmFin = Number(document.getElementById('km_fin').value) || 0;
+  // Se puede enviar solo los km (un día sin registros), o registros, o fotos
+  if (!mine.length && !misFotos.length && !kmIni && !kmFin) {
+    showToast('⚠️ No hay nada para enviar');
+    return;
+  }
   const enviadas = getJornadasEnviadas();
-  const kmYaPuestos = mine.every(r => enviadas.includes(r.chofer + '|' + r.fecha));
+  const fechaForm = document.getElementById('fecha').value;
+  const kmYaPuestos = mine.length
+    ? mine.every(r => enviadas.includes(r.chofer + '|' + r.fecha))
+    : enviadas.includes(currentUser + '|' + fechaForm);
   const kmFaltan = !kmIni || !kmFin;
   const kmMal = kmIni && kmFin && kmFin <= kmIni;
   if (KM_OBLIGATORIOS && !isAdmin && (kmMal || (kmFaltan && !kmYaPuestos))) {
@@ -1048,10 +1147,16 @@ async function shareJSON() {
     nota: localStorage.getItem('flota_nota') || ''
   };
 
+  // Identificador del envío: se mantiene hasta que salga bien, así un reintento no duplica la jornada ni el mail
+  let envioId = localStorage.getItem('flota_envio_id');
+  if (!envioId) { envioId = Date.now() + '_' + Math.random().toString(36).slice(2, 8); localStorage.setItem('flota_envio_id', envioId); }
+
   const payload = {
+    envio_id: envioId,
     records: cleanRecords,
     jornada: jornada,
-    nota: jornada.nota
+    nota: jornada.nota,
+    photos_count: misFotos.length
   };
 
   // Identificación: el chofer con su token, el admin con el suyo
@@ -1059,17 +1164,26 @@ async function shareJSON() {
 
   try {
     // Se lee la respuesta de Google Sheets y solo se confirma si realmente se guardó.
+    const send = () => postToScript({ ...payload, ...auth(), photos: misFotos.map(f => f.data) });
+    let json;
     try {
-      await postToScript({ ...payload, ...auth() });
+      json = await send();
     } catch(err) {
-      // Sesión vencida (el admin cambió el PIN): pedir el PIN y reintentar una vez
+      // Sesión vencida (se liberó el teléfono): se vuelve a vincular y se reintenta una vez
       if (err.message !== 'No autorizado' || isAdmin || !(await reauthChofer())) throw err;
-      await postToScript({ ...payload, ...auth() });
+      json = await send();
+    }
+
+    // Si las fotos fallaron, todo queda en el móvil para reintentar (los datos ya guardados no se duplican)
+    if (misFotos.length && (Number(json.fotos_guardadas) || 0) < misFotos.length) {
+      alert('⚠️ Los datos se guardaron, pero las fotos no se pudieron subir.\n\nTodo sigue en el teléfono: volvé a tocar 📤 Enviar para reintentar (no se duplica nada).');
+      return;
     }
 
     // Se recuerdan los días con km enviados: un registro olvidado de ese día no vuelve a pedir km
     if (kmIni && kmFin) {
       const dias = new Set(getJornadasEnviadas());
+      dias.add(jornada.chofer + '|' + jornada.fecha);
       mine.forEach(r => dias.add(r.chofer + '|' + r.fecha));
       try { localStorage.setItem('flota_jornadas_enviadas', JSON.stringify([...dias].slice(-120))); } catch(_) {}
     }
@@ -1077,11 +1191,17 @@ async function shareJSON() {
     // Ya está en Sheets: se limpian los pendientes del móvil y pasan al Historial (que no se borra)
     const sentIds = new Set(mine.map(r => r.id));
     records = records.filter(r => !sentIds.has(r.id));
+    const sentFotos = new Set(misFotos.map(f => f.id));
+    fotos = fotos.filter(f => !sentFotos.has(f.id));
     localStorage.setItem('flota_records', JSON.stringify(records)); localStorage.removeItem('flota_nota');
+    localStorage.removeItem('flota_envio_id');
+    saveFotos();
     clearJornada();
-    renderRecords(); updateSendCount();
+    renderRecords(); renderFotos(); updateSendCount();
     document.getElementById('nota_jornada').value='';
-    alert('✅ Enviado correctamente.\n\nQuedó guardado en tu Historial.');
+    alert(mine.length
+      ? '✅ Enviado correctamente.\n\nQuedó guardado en tu Historial.'
+      : '✅ Jornada enviada correctamente.');
     loadHistorial();
   } catch(e) {
     // No se pudo confirmar: se conservan los registros y se descarga una copia de respaldo
@@ -1244,6 +1364,7 @@ loadJornada();
 document.getElementById('nota_jornada').value = localStorage.getItem('flota_nota') || '';
 renderChoferSelect();
 renderRecords();
+renderFotos();
 updateSendCount();
 
 // Check admin flag
