@@ -406,7 +406,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-05.2';
+const APP_VERSION = '2026-10-14.2';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -924,8 +924,11 @@ function selectType(type) {
   const isP = type === 'privado';
   document.getElementById('field_subtype').classList.toggle('hidden', !isP);
   document.getElementById('field_destino').classList.toggle('hidden', !isP);
-  if (isP) document.getElementById('field_importe').classList.add('hidden');
-  else document.getElementById('field_importe').classList.remove('hidden');
+  // Privado: el importe aparece al elegir la forma de pago. Peaje: se paga automático, el chofer no sabe el importe.
+  document.getElementById('field_importe').classList.toggle('hidden', isP || type === 'peaje');
+  document.getElementById('observaciones').placeholder = type === 'peaje'
+    ? 'Obligatorio: a qué peaje corresponde (ej: AP-7 salida 12)'
+    : 'Notas adicionales...';
 }
 
 function selectSubtype(sub) {
@@ -941,8 +944,15 @@ function addRecord() {
   if (!chofer) { showToast('⚠️ Selecciona un chofer'); return; }
   if (!selectedType) { showToast('⚠️ Selecciona el tipo'); return; }
   if (selectedType === 'privado' && !selectedSubtype) { showToast('⚠️ Selecciona forma de pago'); return; }
+  // Peaje sin importe (pago automático): es obligatorio aclarar a qué peaje corresponde
+  if (selectedType === 'peaje' && !document.getElementById('observaciones').value.trim()) {
+    showToast('⚠️ Escribí en Observaciones a qué peaje corresponde');
+    document.getElementById('observaciones').focus();
+    return;
+  }
   const finalType = selectedType === 'privado' ? selectedSubtype : selectedType;
-  const importe = finalType === 'privado_nocobrar' ? 0 : (parseFloat(document.getElementById('importe').value)||0);
+  // Sin cobrar y peajes (pago automático) se guardan sin importe
+  const importe = ['privado_nocobrar','peaje'].includes(finalType) ? 0 : (parseFloat(document.getElementById('importe').value)||0);
   if (importe<=0 && !['peaje','parking','pinchazo','otro','privado_nocobrar'].includes(finalType)) {
     showToast('⚠️ Ingresa un importe'); return;
   }
@@ -1024,6 +1034,7 @@ function resetForm() {
   document.getElementById('field_subtype').classList.add('hidden');
   document.getElementById('field_destino').classList.add('hidden');
   document.getElementById('field_importe').classList.remove('hidden');
+  document.getElementById('observaciones').placeholder = 'Notas adicionales...';
 }
 
 // ---- HISTORIAL ----
