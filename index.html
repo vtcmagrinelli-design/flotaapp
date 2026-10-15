@@ -406,7 +406,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-14.3';
+const APP_VERSION = '2026-10-15.2';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -935,7 +935,8 @@ function selectSubtype(sub) {
   selectedSubtype = sub;
   document.querySelectorAll('.subtype-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('sub_' + sub).classList.add('active');
-  document.getElementById('field_importe').classList.toggle('hidden', sub === 'privado_nocobrar');
+  // Todas las formas de pago (también "No cobrar") llevan el precio del viaje
+  document.getElementById('field_importe').classList.remove('hidden');
 }
 
 // ---- RECORDS ----
@@ -952,8 +953,9 @@ function addRecord() {
   }
   const finalType = selectedType === 'privado' ? selectedSubtype : selectedType;
   // Sin cobrar y peajes (pago automático) se guardan sin importe
-  const importe = ['privado_nocobrar','peaje'].includes(finalType) ? 0 : (parseFloat(document.getElementById('importe').value)||0);
-  if (importe<=0 && !['peaje','parking','pinchazo','otro','privado_nocobrar'].includes(finalType)) {
+  // Peajes (pago automático) van sin importe. "No cobrar" lleva el precio del viaje, aunque no se cobre.
+  const importe = finalType === 'peaje' ? 0 : (parseFloat(document.getElementById('importe').value)||0);
+  if (importe<=0 && !['peaje','parking','pinchazo','otro'].includes(finalType)) {
     showToast('⚠️ Ingresa un importe'); return;
   }
   const rec = {
@@ -1111,6 +1113,7 @@ const TIPOS_GASTO = ['peaje','parking','pinchazo','otro'];
 // Importe con signo: lo cobrado suma, los gastos restan (igual que el TOTAL del mail)
 function importeNeto(tipo, importe) {
   const v = Number(importe) || 0;
+  // "No cobrar" suma: el chofer no lo cobra al pasajero, pero hay que pagárselo
   return TIPOS_GASTO.includes(String(tipo)) ? -v : v;
 }
 
@@ -1136,7 +1139,8 @@ function renderHistorial() {
   // Lo más reciente primero
   const orden = k => { const [m, s] = k.split(' - Semana '); return MES_ORDEN.indexOf(m) * 10 + (Number(s) || 0); };
   el.innerHTML = Object.entries(bySemana).sort((a,b) => orden(b[0]) - orden(a[0])).map(([key,{recs,jors}])=>{
-    const tP=recs.filter(r=>String(r.tipo).startsWith('privado')).reduce((s,r)=>s+r.importe,0);
+    const tP=recs.filter(r=>['privado_efvo','privado_datafono'].includes(r.tipo)).reduce((s,r)=>s+r.importe,0);
+    const tNC=recs.filter(r=>r.tipo==='privado_nocobrar').reduce((s,r)=>s+r.importe,0); // no cobrado: a pagar al chofer
     const tD=recs.filter(r=>r.tipo==='datafono').reduce((s,r)=>s+r.importe,0);
     const tG=recs.filter(r=>TIPOS_GASTO.includes(r.tipo)).reduce((s,r)=>s+r.importe,0);
     const tot=recs.reduce((s,r)=>s+importeNeto(r.tipo, r.importe),0); // cobrado − gastos
@@ -1148,7 +1152,8 @@ function renderHistorial() {
       <div class="hist-stat"><span>🛣️ Km recorridos:</span><span>${km} km${dias ? ' · ' + dias + (dias === 1 ? ' día' : ' días') : ''}</span></div>
       <div class="hist-stat"><span>💵 Privados:</span><span>${tP.toFixed(2)} €</span></div>
       <div class="hist-stat"><span>💳 Datáfono:</span><span>${tD.toFixed(2)} €</span></div>
-      <div class="hist-stat"><span>🚗 Gastos:</span><span>-${tG.toFixed(2)} €</span></div>
+      <div class="hist-stat"><span>🚗 Gastos:</span><span>${tG ? '-' : ''}${tG.toFixed(2)} €</span></div>
+      ${tNC ? `<div class="hist-stat"><span>🎁 Sin cobrar (a pagar):</span><span>${tNC.toFixed(2)} €</span></div>` : ''}
       <div class="hist-stat"><span>TOTAL:</span><span>${tot.toFixed(2)} €</span></div>
     </div>`;
   }).join('');
