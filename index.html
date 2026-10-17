@@ -212,10 +212,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
       </div>
     </div>
     <div id="taller_avisos"><div class="empty-msg">⏳ Cargando...</div></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px">
-      <span style="font-size:11px;color:#aaa" id="taller_info"></span>
-      <button onclick="probarAvisos()" style="background:none;border:none;color:#2980B9;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📧 Mandar aviso ahora</button>
-    </div>
+    <div style="font-size:11px;color:#aaa;margin-top:6px" id="taller_info"></div>
   </div>
   <div class="card">
     <div class="crm-header">
@@ -282,6 +279,11 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
   <div class="card">
     <h2>⏱️ Jornada del Dia</h2>
+    <!-- Solo para quien no tiene coche fijo (p. ej. Pao cuando cubre a alguien): los km se suman a ese coche -->
+    <div class="form-group hidden" id="vehiculo_hoy_box">
+      <label>🚗 ¿Qué coche usaste hoy?</label>
+      <select id="vehiculo_hoy" onchange="saveJornada()"></select>
+    </div>
     <div class="row2">
       <div class="form-group"><label>Hora inicio</label><input type="time" id="hora_inicio" onchange="saveJornada()"></div>
       <div class="form-group"><label>Hora fin</label><input type="time" id="hora_fin" onchange="saveJornada()"></div>
@@ -420,7 +422,8 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
     </div>
     <div class="form-group"><label>Nombre</label><input id="edit_nombre" type="text" placeholder="Nombre completo"></div>
     <div class="form-group"><label>Teléfono</label><input id="edit_telefono" type="tel" placeholder="+34 600 000 000"></div>
-    <div class="form-group"><label>Vehículo asignado</label><input id="edit_vehiculo" type="text" placeholder="Tesla Model Y - ABC1234"></div>
+    <div class="form-group"><label>Vehículo asignado</label><select id="edit_vehiculo"></select>
+      <div style="font-size:11px;color:#aaa;margin-top:4px">Los coches se agregan en 🔧 Taller → + Coche. Con esto, los km que manda el chofer actualizan los del coche.</div></div>
     <div class="form-group">
       <label>Estado</label>
       <select id="edit_estado"><option value="activo">Activo</option><option value="inactivo">Inactivo</option></select>
@@ -448,20 +451,42 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
     <div class="form-group">
       <label>Qué se hizo</label>
       <select id="sv_tipo" onchange="sugerirProximo()">
-        <option>ITV</option>
-        <option>ROTACIÓN NEUMÁTICOS</option>
-        <option>CAMBIO NEUMÁTICOS</option>
-        <option>SEGURO</option>
-        <option>REVISIÓN / SERVICIO</option>
-        <option>FRENOS</option>
-        <option>LÍQUIDO DE FRENOS</option>
-        <option>FILTRO HABITÁCULO</option>
-        <option>ALINEACIÓN</option>
-        <option>BATERÍA 12V</option>
-        <option>LIMPIAPARABRISAS</option>
-        <option>OTRO</option>
+        <optgroup label="Neumáticos">
+          <option>ROTACIÓN NEUMÁTICOS</option>
+          <option>CAMBIO NEUMÁTICOS</option>
+          <option>ALINEACIÓN</option>
+          <option>EQUILIBRADO</option>
+          <option>REPARACIÓN PINCHAZO</option>
+        </optgroup>
+        <optgroup label="Frenos y suspensión">
+          <option>PASTILLAS DE FRENO</option>
+          <option>DISCOS DE FRENO</option>
+          <option>LÍQUIDO DE FRENOS</option>
+          <option>AMORTIGUADORES</option>
+          <option>SUSPENSIÓN / BRAZOS</option>
+        </optgroup>
+        <optgroup label="Papeles">
+          <option>ITV</option>
+          <option>SEGURO</option>
+        </optgroup>
+        <optgroup label="Motor (Lexus / no eléctricos)">
+          <option>ACEITE Y FILTRO</option>
+          <option>FILTRO DE AIRE</option>
+          <option>BUJÍAS</option>
+          <option>REFRIGERANTE</option>
+        </optgroup>
+        <optgroup label="Otros">
+          <option>REVISIÓN / SERVICIO</option>
+          <option>FILTRO HABITÁCULO</option>
+          <option>BATERÍA 12V</option>
+          <option>AIRE ACONDICIONADO</option>
+          <option>LIMPIAPARABRISAS</option>
+          <option>CHAPA Y PINTURA</option>
+          <option value="OTRO">OTRO (escribir cuál)</option>
+        </optgroup>
       </select>
     </div>
+    <div class="form-group hidden" id="sv_otro_box"><label>¿Qué se cambió?</label><input type="text" id="sv_otro" placeholder="Ej: Escobillas, retrovisor..."></div>
     <div class="row2">
       <div class="form-group"><label>Fecha</label><input type="date" id="sv_fecha" onchange="sugerirProximo()"></div>
       <div class="form-group"><label>Km del coche</label><input type="number" id="sv_km" inputmode="numeric" placeholder="0" oninput="sugerirProximo()"></div>
@@ -508,6 +533,19 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
   </div>
 </div>
 
+<!-- MODAL AVISOS DE MANTENIMIENTO (al abrir la app) -->
+<div id="modal_aviso" class="modal-overlay" style="z-index:400">
+  <div style="background:white;border-radius:16px;max-width:360px;margin:90px auto 0;padding:20px;text-align:center">
+    <div style="font-size:38px;margin-bottom:4px">🔧</div>
+    <h2 style="font-size:16px;color:#1B2838;margin-bottom:12px">Avisos de mantenimiento</h2>
+    <div id="aviso_lista" style="max-height:50vh;overflow-y:auto"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button onclick="closeModal('modal_aviso')" style="flex:1;padding:12px;border:none;border-radius:10px;background:#f0f0f0;color:#666;font-weight:700;font-size:14px;cursor:pointer">Después</button>
+      <button onclick="verTaller()" style="flex:1;padding:12px;border:none;border-radius:10px;background:#2980B9;color:white;font-weight:700;font-size:14px;cursor:pointer">Ver Taller</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL PIN (4 números, ocultos, teclado numérico) -->
 <div id="modal_pin" class="modal-overlay" style="z-index:700">
   <div style="background:white;border-radius:16px;max-width:320px;margin:120px auto 0;padding:22px;text-align:center">
@@ -530,7 +568,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-17.2';
+const APP_VERSION = '2026-10-17.9';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -593,6 +631,10 @@ async function loadChoferes(silent = false) {
     if (json.status === 'ok' && Array.isArray(json.choferes)) {
       choferes = json.choferes;
       localStorage.setItem('flota_choferes', JSON.stringify(choferes));
+      if (Array.isArray(json.vehiculos)) {
+        vehiculosLista = json.vehiculos;
+        localStorage.setItem('flota_vehiculos', JSON.stringify(vehiculosLista));
+      }
       choferesLoaded = true;
     } else {
       throw new Error('Respuesta inesperada');
@@ -606,6 +648,7 @@ async function loadChoferes(silent = false) {
     showChoferesLoading(false);
   }
   renderChoferSelect();
+  renderVehiculoHoy();
   if (isAdmin) renderCRM();
 }
 
@@ -835,6 +878,7 @@ async function reauthChofer() {
 
 function applySession() {
   loadHistorialCache(); // historial del usuario que entra (no el del anterior)
+  renderVehiculoHoy();
   renderRecords(); renderFotos(); updateSendCount(); // lo pendiente de ESTE usuario
   const sel = document.getElementById('chofer');
   if (isAdmin) {
@@ -844,7 +888,7 @@ function applySession() {
     document.getElementById('tab_crm').style.display = 'flex';
     document.getElementById('tab_datos').style.display = 'flex';
     document.getElementById('tab_taller').style.display = 'flex';
-    loadTaller(true); // para el número de avisos en la pestaña
+    loadTaller(true).then(avisoAlAbrir); // número de avisos en la pestaña + cartel al entrar
     // El admin no carga ni envía registros, y todo lo enviado lo ve en Datos: esas pestañas son de los choferes
     document.getElementById('tab_registro').style.display = 'none';
     document.getElementById('tab_historial').style.display = 'none';
@@ -940,7 +984,21 @@ function avisoTxt(a) {
   if (a.km) p.push(a.faltan <= 0 ? 'Pasado ' + kmTxt(-a.faltan) : 'Faltan ' + kmTxt(a.faltan));
   return p.join(' · ');
 }
-const tipoIcon = t => ({ 'ITV':'🛂', 'SEGURO':'🛡️', 'ROTACIÓN NEUMÁTICOS':'🔄', 'CAMBIO NEUMÁTICOS':'🛞', 'FRENOS':'🛑' }[t] || '🔧');
+const tipoIcon = t => ({ 'ITV':'🛂', 'SEGURO':'🛡️', 'ROTACIÓN NEUMÁTICOS':'🔄', 'CAMBIO NEUMÁTICOS':'🛞', 'ALINEACIÓN':'📐',
+  'EQUILIBRADO':'⚖️', 'REPARACIÓN PINCHAZO':'🩹', 'FRENOS':'🛑', 'PASTILLAS DE FRENO':'🛑', 'DISCOS DE FRENO':'💿',
+  'LÍQUIDO DE FRENOS':'💧', 'AMORTIGUADORES':'🔩', 'SUSPENSIÓN / BRAZOS':'🔩', 'BATERÍA 12V':'🔋',
+  'AIRE ACONDICIONADO':'❄️', 'ACEITE Y FILTRO':'🛢️', 'FILTRO DE AIRE':'🌬️', 'BUJÍAS':'⚡', 'REFRIGERANTE':'🌡️', 'FILTRO HABITÁCULO':'🌬️', 'CHAPA Y PINTURA':'🎨' }[t] || '🔧');
+
+// Último cambio de cada pieza de un coche (sin ITV ni seguro, que ya salen arriba), con los km hechos desde entonces
+function ultimosCambios(v, servs) {
+  const vistos = new Set(), res = [];
+  servs.forEach(s => {
+    if (s.TIPO === 'ITV' || s.TIPO === 'SEGURO' || vistos.has(s.TIPO)) return;
+    vistos.add(s.TIPO);
+    res.push({ s, hechos: s.KM && v.kmActual >= s.KM ? v.kmActual - s.KM : null });
+  });
+  return res;
+}
 
 function renderTaller() {
   const avisosEl = document.getElementById('taller_avisos');
@@ -964,7 +1022,7 @@ function renderTaller() {
       <button class="btn-sm btn-edit" style="flex:0 0 auto" data-v="${esc(v.ID)}" data-t="${esc(a.tipo)}" onclick="openServicio(this.dataset.v,this.dataset.t)">Hecho ✓</button>
     </div>`).join('')
     : '<div class="aviso nv-ok"><span style="font-size:20px">✅</span><div class="at"><b>Todo al día</b><div class="as">Sin vencimientos en los próximos ' + taller.avisoDias + ' días ni ' + kmTxt(taller.avisoKm) + '</div></div></div>';
-  document.getElementById('taller_info').textContent = 'Te llega un mail cuando falten ' + taller.avisoDias + ' días o ' + kmTxt(taller.avisoKm) + '.';
+  document.getElementById('taller_info').textContent = 'Avisa acá cuando falten ' + taller.avisoDias + ' días o ' + kmTxt(taller.avisoKm) + ', y al abrir la app.';
 
   const anio = (taller.hoy || '').slice(0, 4);
   vehEl.innerHTML = taller.vehiculos.length ? taller.vehiculos.map(v => {
@@ -978,7 +1036,7 @@ function renderTaller() {
     <div class="veh-card">
       <div class="veh-top">
         <div><div class="veh-name">${esc(v.NOMBRE)}</div>
-          <div class="veh-sub">${esc(v.MATRICULA || 'Sin matrícula')}${gasto ? ' · Gastado ' + anio + ': ' + gasto.toFixed(2) + ' €' : ''}</div></div>
+          <div class="veh-sub">${v.NOTAS ? esc(v.NOTAS) + ' · ' : ''}${esc(v.MATRICULA || 'Sin matrícula')}${gasto ? ' · Gastado ' + anio + ': ' + gasto.toFixed(2) + ' €' : ''}</div></div>
         <div class="veh-km">${v.kmActual ? kmTxt(v.kmActual) : '— km'}<small>${esc(origen)}</small></div>
       </div>
       <div class="veh-grid">${v.avisos.map(a => `
@@ -987,6 +1045,16 @@ function renderTaller() {
           ${a.fecha && a.dias > 60 ? '' : a.fecha ? '<div style="color:#999">' + fechaCorta(a.fecha) + '</div>' : ''}
           ${a.km ? '<div style="color:#999">a los ' + kmTxt(a.km) + '</div>' : ''}
         </div>`).join('')}</div>
+      ${(() => { const u = ultimosCambios(v, servs); return u.length ? `
+      <div style="margin-bottom:10px">
+        <div class="section-divider" style="margin-top:0">Últimos cambios</div>
+        ${u.map(({ s, hechos }) => `
+        <div style="display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0">
+          <span>${tipoIcon(s.TIPO)} <b>${esc(s.TIPO)}</b>${s.DETALLE ? ' <span style="color:#aaa">· ' + esc(s.DETALLE) + '</span>' : ''}</span>
+          <span style="color:#888;white-space:nowrap;text-align:right">${fechaCorta(s.FECHA)}${s.KM ? ' · ' + kmTxt(s.KM) : ''}
+            ${hechos !== null ? '<br><span style="color:#2980B9;font-weight:700">hace ' + kmTxt(hechos) + '</span>' : ''}</span>
+        </div>`).join('')}
+      </div>` : ''; })()}
       <div class="chofer-actions">
         <button class="btn-sm" style="background:#EAFAF1;color:#1E8449" data-v="${esc(v.ID)}" onclick="openServicio(this.dataset.v)">➕ Cambio</button>
         <button class="btn-sm btn-edit" data-v="${esc(v.ID)}" onclick="actualizarKm(this.dataset.v)">📏 Km</button>
@@ -1017,7 +1085,13 @@ function openServicio(vehId, tipo) {
   const sel = document.getElementById('sv_vehiculo');
   sel.innerHTML = taller.vehiculos.map(v => `<option value="${esc(v.ID)}">${esc(v.NOMBRE)}${v.MATRICULA ? ' · ' + esc(v.MATRICULA) : ''}</option>`).join('');
   if (vehId) sel.value = vehId;
-  if (tipo) document.getElementById('sv_tipo').value = tipo;
+  const tipoSel = document.getElementById('sv_tipo');
+  document.getElementById('sv_otro').value = '';
+  if (tipo) {
+    tipoSel.value = tipo;
+    // Un tipo escrito a mano (OTRO) no está en la lista
+    if (tipoSel.value !== tipo) { tipoSel.value = 'OTRO'; document.getElementById('sv_otro').value = tipo; }
+  }
   document.getElementById('sv_fecha').value = localDateStr(new Date());
   const v = vehTaller(sel.value);
   document.getElementById('sv_km').value = v && v.kmActual ? v.kmActual : '';
@@ -1034,6 +1108,14 @@ function sugerirProximo() {
   const v = vehTaller(document.getElementById('sv_vehiculo').value);
   const masAnios = n => { if (!fecha) return ''; const [y, m, d] = fecha.split('-'); return (Number(y) + n) + '-' + m + '-' + d; };
   let pf = '', pk = '', ayuda = '';
+  document.getElementById('sv_otro_box').classList.toggle('hidden', tipo !== 'OTRO');
+  document.getElementById('sv_detalle').placeholder = {
+    'CAMBIO NEUMÁTICOS': 'Cuáles y marca: las 4, delanteras... Michelin 255/45 R19',
+    'ROTACIÓN NEUMÁTICOS': 'Ej: delanteras atrás, cruzadas...',
+    'PASTILLAS DE FRENO': 'Delanteras / traseras, marca...',
+    'DISCOS DE FRENO': 'Delanteros / traseros, marca...',
+    'AMORTIGUADORES': 'Delanteros / traseros, marca...',
+  }[tipo] || 'Qué se hizo, marca, medidas...';
   if (tipo === 'ITV') { pf = masAnios(1); ayuda = 'La fecha de la próxima ITV figura en la tarjeta que te dan. Revisala.'; }
   else if (tipo === 'SEGURO') { pf = masAnios(1); ayuda = 'Poné la fecha de vencimiento de la póliza nueva.'; }
   else if (tipo === 'ROTACIÓN NEUMÁTICOS' || tipo === 'CAMBIO NEUMÁTICOS') {
@@ -1041,7 +1123,11 @@ function sugerirProximo() {
     if (km) pk = km + cada;
     ayuda = 'Próxima rotación cada ' + kmTxt(cada) + (km ? '' : ' — poné los km del coche.');
   }
-  else if (tipo === 'LÍQUIDO DE FRENOS' || tipo === 'FILTRO HABITÁCULO') { pf = masAnios(2); ayuda = 'Tesla recomienda revisarlo cada 2 años.'; }
+  else if (tipo === 'LÍQUIDO DE FRENOS' || tipo === 'FILTRO HABITÁCULO') { pf = masAnios(2); ayuda = 'Se suele cambiar cada 2 años. Revisá lo que dice el manual del coche.'; }
+  else if (tipo === 'ACEITE Y FILTRO') { if (km) pk = km + 15000; pf = masAnios(1); ayuda = 'Lexus híbrido: cada 15.000 km o 1 año, lo que llegue antes. Revisá el manual.'; }
+  else if (tipo === 'FILTRO DE AIRE') { if (km) pk = km + 30000; ayuda = 'Suele cambiarse cada 30.000 km aprox.'; }
+  else if (tipo === 'AMORTIGUADORES') { if (km) pk = km + 80000; ayuda = 'Suelen durar unos 80.000 km. Cambialo si querés otro aviso.'; }
+  else if (tipo === 'PASTILLAS DE FRENO' || tipo === 'DISCOS DE FRENO') { ayuda = 'En híbridos y eléctricos duran mucho por la frenada regenerativa. Si querés aviso, poné unos km.'; }
   else ayuda = 'Si querés que te avise, poné una fecha o unos km.';
   document.getElementById('sv_prox_fecha').value = pf;
   document.getElementById('sv_prox_km').value = pk;
@@ -1064,6 +1150,10 @@ async function saveServicio() {
   const g = id => document.getElementById(id).value.trim();
   const servicio = { VEHICULO_ID: g('sv_vehiculo'), TIPO: g('sv_tipo'), FECHA: g('sv_fecha'), KM: g('sv_km'),
     DETALLE: g('sv_detalle'), TALLER: g('sv_taller'), COSTE: g('sv_coste'), PROX_FECHA: g('sv_prox_fecha'), PROX_KM: g('sv_prox_km') };
+  if (servicio.TIPO === 'OTRO') {
+    servicio.TIPO = g('sv_otro').toUpperCase();
+    if (!servicio.TIPO) { showToast('Escribí qué se cambió'); return; }
+  }
   if (!servicio.FECHA) { showToast('Poné la fecha'); return; }
   if ((servicio.TIPO === 'ROTACIÓN NEUMÁTICOS' || servicio.TIPO === 'CAMBIO NEUMÁTICOS') && !servicio.KM) {
     showToast('Poné los km: con eso se calcula la próxima rotación'); return;
@@ -1123,15 +1213,27 @@ async function actualizarKm(id) {
   await postTaller({ action: 'saveVehiculo', vehiculo: { ID: v.ID, NOMBRE: v.NOMBRE, KM_ACTUAL: km } }, '✅ Km actualizados');
 }
 
-async function probarAvisos() {
-  showToast('📧 Enviando...');
-  try {
-    const json = await postToScript({ action: 'probarAvisos', token: adminToken });
-    if (json.action === 'enviado') showToast('✅ Mail enviado a ' + json.destino);
-    else showToast('✅ No hay nada por vencer: no hace falta mail');
-  } catch(e) {
-    alert('⚠️ No se pudo mandar el mail.\n\n' + e.message);
-  }
+// Al abrir la app el admin ve un cartel con lo vencido / por vencer (una vez por día)
+function avisoAlAbrir() {
+  if (!taller || !isAdmin) return;
+  const urg = [];
+  taller.vehiculos.forEach(v => v.avisos.forEach(a => { if (a.nivel === 'vencido' || a.nivel === 'pronto') urg.push({ v, a }); }));
+  let visto = null;
+  try { visto = localStorage.getItem('flota_taller_aviso'); } catch(e) {}
+  if (!urg.length || visto === taller.hoy) return;
+  try { localStorage.setItem('flota_taller_aviso', taller.hoy); } catch(e) {}
+  urg.sort((x, y) => (y.a.nivel === 'vencido') - (x.a.nivel === 'vencido'));
+  document.getElementById('aviso_lista').innerHTML = urg.map(({ v, a }) => `
+    <div class="aviso nv-${a.nivel}" style="text-align:left">
+      <span style="font-size:18px">${a.nivel === 'vencido' ? '🚨' : '⚠️'}</span>
+      <div class="at"><b>${esc(a.tipo)}</b> · ${esc(v.NOMBRE)}<div class="as">${esc(avisoTxt(a))}</div></div>
+    </div>`).join('');
+  document.getElementById('modal_aviso').style.display = 'block';
+}
+
+function verTaller() {
+  closeModal('modal_aviso');
+  showPage('taller', document.getElementById('tab_taller'));
 }
 
 // ---- CRM ----
@@ -1170,11 +1272,28 @@ function renderCRM() {
   }).join('');
 }
 
+// Lista de coches del Taller para asignar al chofer (incluye los coches agregados después).
+// Si el chofer tenía escrito un coche que no está en la lista, se mantiene como opción.
+function fillVehiculoSelect(actual) {
+  const sel = document.getElementById('edit_vehiculo');
+  const opts = (taller ? taller.vehiculos : []).map(v => v.MATRICULA ? v.NOMBRE + ' - ' + v.MATRICULA : v.NOMBRE);
+  actual = String(actual || '').trim();
+  const norm = s => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Si lo guardado contiene la matrícula de un coche (o es su nombre, p. ej. "Lexus"), se selecciona ese coche
+  const lista = taller ? taller.vehiculos : [];
+  const match = actual && (lista.find(v => v.MATRICULA && norm(actual).includes(norm(v.MATRICULA))) ||
+                           lista.find(v => norm(v.NOMBRE) === norm(actual)));
+  const valor = match ? (match.MATRICULA ? match.NOMBRE + ' - ' + match.MATRICULA : match.NOMBRE) : actual;
+  if (valor && !opts.includes(valor)) opts.push(valor);
+  sel.innerHTML = '<option value="">— Sin coche —</option>' + opts.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  sel.value = valor;
+}
+
 function openAddChofer() {
   document.getElementById('modal_edit_title').textContent = '➕ Nuevo Chofer';
   document.getElementById('edit_nombre').value = '';
   document.getElementById('edit_telefono').value = '';
-  document.getElementById('edit_vehiculo').value = '';
+  fillVehiculoSelect('');
   document.getElementById('edit_estado').value = 'activo';
   document.getElementById('edit_pin_box').style.display = 'none'; // un chofer nuevo crea su PIN al entrar
   document.getElementById('edit_reset_pin').checked = false;
@@ -1187,7 +1306,7 @@ function editChofer(i) {
   document.getElementById('modal_edit_title').textContent = '✏️ Editar: ' + c.name;
   document.getElementById('edit_nombre').value = c.name;
   document.getElementById('edit_telefono').value = c.telefono || '';
-  document.getElementById('edit_vehiculo').value = c.vehiculo || '';
+  fillVehiculoSelect(c.vehiculo);
   document.getElementById('edit_estado').value = c.estado || 'activo';
   // Se puede borrar el PIN (o el teléfono vinculado de la versión anterior) para que cree uno nuevo
   document.getElementById('edit_pin_box').style.display = (c.tienePin || c.vinculado) ? 'block' : 'none';
@@ -1365,7 +1484,31 @@ function deleteRecord(id) {
 }
 
 // Jornada (horas y km): se conserva entre registros y al recargar la página
-const JORNADA_FIELDS = ['hora_inicio','hora_fin','km_inicio','km_fin'];
+const JORNADA_FIELDS = ['hora_inicio','hora_fin','km_inicio','km_fin','vehiculo_hoy'];
+
+// Coches de la flota (solo nombres, vienen con la lista de choferes)
+let vehiculosLista = [];
+try { vehiculosLista = JSON.parse(localStorage.getItem('flota_vehiculos') || '[]'); } catch(e) {}
+
+// Un chofer sin coche asignado elige con qué coche trabajó hoy, así sus km cuentan para ese coche
+function necesitaElegirCoche() {
+  if (isAdmin || !currentUser || !vehiculosLista.length) return false;
+  const yo = choferes.find(c => c.name === currentUser);
+  return !!yo && !String(yo.vehiculo || '').trim();
+}
+
+function renderVehiculoHoy() {
+  const box = document.getElementById('vehiculo_hoy_box');
+  const ver = necesitaElegirCoche();
+  box.classList.toggle('hidden', !ver);
+  if (!ver) return;
+  const sel = document.getElementById('vehiculo_hoy');
+  let guardado = '';
+  try { guardado = JSON.parse(localStorage.getItem('flota_jornada') || '{}').vehiculo_hoy || ''; } catch(e) {}
+  sel.innerHTML = '<option value="">Elegí el coche...</option>' +
+    vehiculosLista.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = vehiculosLista.includes(guardado) ? guardado : '';
+}
 
 function saveJornada() {
   const j = {};
@@ -1622,6 +1765,12 @@ async function shareJSON() {
     showPage('registro', document.getElementById('tab_registro'));
     return;
   }
+  const vehiculoHoy = necesitaElegirCoche() ? document.getElementById('vehiculo_hoy').value : '';
+  if (necesitaElegirCoche() && (kmIni || kmFin) && !vehiculoHoy) {
+    alert('🚗 Elegí qué coche usaste hoy (pestaña Registro, arriba de los Km).');
+    showPage('registro', document.getElementById('tab_registro'));
+    return;
+  }
   sending = true;
   const btn = document.getElementById('btn_enviar');
   btn.disabled = true; btn.style.opacity = '0.6';
@@ -1646,6 +1795,7 @@ async function shareJSON() {
     hora_fin: document.getElementById('hora_fin').value,
     km_inicio: Number(document.getElementById('km_inicio').value) || 0,
     km_fin: Number(document.getElementById('km_fin').value) || 0,
+    vehiculo: vehiculoHoy,
     nota: localStorage.getItem('flota_nota') || ''
   };
 
