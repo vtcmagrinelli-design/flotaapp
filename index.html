@@ -523,7 +523,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
       <div class="form-group"><label>Rotar cada (km)</label><input type="number" id="vh_rotacion" inputmode="numeric" placeholder="10000"></div>
     </div>
     <div class="row2">
-      <div class="form-group"><label>ITV vence</label><input type="date" id="vh_itv"></div>
+      <div class="form-group"><label>ITV vence (mes y año)</label><input type="month" id="vh_itv" placeholder="2027-04"></div>
       <div class="form-group"><label>Seguro vence</label><input type="date" id="vh_seguro"></div>
     </div>
     <div class="form-group"><label>Notas</label><input type="text" id="vh_notas" placeholder="Póliza, bastidor..."></div>
@@ -568,7 +568,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-17.9';
+const APP_VERSION = '2026-10-17.10';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -971,6 +971,21 @@ async function loadTaller(silent = false) {
 }
 
 function fechaCorta(f) { return f ? f.split('-').reverse().join('/') : ''; }
+
+// La ITV solo trae mes y año: se guarda como el último día de ese mes y se muestra "04/2027"
+function mesAFecha(v) {
+  v = String(v || '').trim();
+  let m = v.match(/^(\d{4})-(\d{1,2})(?:-\d{1,2})?$/), y, mo;
+  if (m) { y = +m[1]; mo = +m[2]; }
+  else if ((m = v.match(/^(\d{1,2})[\/\-.](\d{4})$/))) { y = +m[2]; mo = +m[1]; }
+  else return '';
+  if (mo < 1 || mo > 12) return '';
+  const ultimo = new Date(y, mo, 0).getDate();
+  return y + '-' + String(mo).padStart(2, '0') + '-' + String(ultimo).padStart(2, '0');
+}
+function mesCorto(f) { return f ? f.slice(5, 7) + '/' + f.slice(0, 4) : ''; }
+// Fecha para mostrar: la ITV solo mes/año, el resto día completo
+function fechaDe(tipo, f) { return tipo === 'ITV' ? mesCorto(f) : fechaCorta(f); }
 function kmTxt(n) { return Number(n || 0).toLocaleString('es-ES') + ' km'; }
 
 // Texto del estado de un aviso: "vence en 12 días", "faltan 800 km"...
@@ -980,7 +995,7 @@ function avisoTxt(a) {
   }
   const p = [];
   if (a.fecha) p.push(a.dias < 0 ? 'Venció hace ' + (-a.dias) + ' días' : a.dias === 0 ? 'Vence HOY' :
-                     (a.dias <= 60 ? 'En ' + a.dias + ' días' : fechaCorta(a.fecha)));
+                     (a.dias <= 60 ? 'En ' + a.dias + ' días' : fechaDe(a.tipo, a.fecha)));
   if (a.km) p.push(a.faltan <= 0 ? 'Pasado ' + kmTxt(-a.faltan) : 'Faltan ' + kmTxt(a.faltan));
   return p.join(' · ');
 }
@@ -1042,7 +1057,7 @@ function renderTaller() {
       <div class="veh-grid">${v.avisos.map(a => `
         <div class="aviso nv-${a.nivel}"><b>${tipoIcon(a.tipo)} ${esc(a.tipo)}</b>
           <div class="as">${esc(avisoTxt(a))}</div>
-          ${a.fecha && a.dias > 60 ? '' : a.fecha ? '<div style="color:#999">' + fechaCorta(a.fecha) + '</div>' : ''}
+          ${a.fecha && a.dias > 60 ? '' : a.fecha ? '<div style="color:#999">' + fechaDe(a.tipo, a.fecha) + '</div>' : ''}
           ${a.km ? '<div style="color:#999">a los ' + kmTxt(a.km) + '</div>' : ''}
         </div>`).join('')}</div>
       ${(() => { const u = ultimosCambios(v, servs); return u.length ? `
@@ -1066,7 +1081,7 @@ function renderTaller() {
         <div class="serv-item"><span>${tipoIcon(s.TIPO)}</span>
           <div class="sd"><b>${esc(s.TIPO)}</b> · ${fechaCorta(s.FECHA)}${s.KM ? ' · ' + kmTxt(s.KM) : ''}${s.COSTE ? ' · ' + Number(s.COSTE).toFixed(2) + ' €' : ''}
             ${s.DETALLE ? '<br>' + esc(s.DETALLE) : ''}${s.TALLER ? '<br>🏪 ' + esc(s.TALLER) : ''}
-            ${s.PROX_FECHA || s.PROX_KM ? '<br>⏭️ Próximo: ' + [fechaCorta(s.PROX_FECHA), s.PROX_KM ? kmTxt(s.PROX_KM) : ''].filter(Boolean).join(' o ') : ''}</div>
+            ${s.PROX_FECHA || s.PROX_KM ? '<br>⏭️ Próximo: ' + [fechaDe(s.TIPO, s.PROX_FECHA), s.PROX_KM ? kmTxt(s.PROX_KM) : ''].filter(Boolean).join(' o ') : ''}</div>
           <button class="btn-del" data-s="${esc(s.ID)}" onclick="deleteServicio(this.dataset.s)">🗑️</button></div>`).join('')
         : '<div class="empty-msg" style="padding:10px 0">Sin cambios cargados.</div>'}</div>` : ''}
     </div>`;
@@ -1116,7 +1131,7 @@ function sugerirProximo() {
     'DISCOS DE FRENO': 'Delanteros / traseros, marca...',
     'AMORTIGUADORES': 'Delanteros / traseros, marca...',
   }[tipo] || 'Qué se hizo, marca, medidas...';
-  if (tipo === 'ITV') { pf = masAnios(1); ayuda = 'La fecha de la próxima ITV figura en la tarjeta que te dan. Revisala.'; }
+  if (tipo === 'ITV') { pf = masAnios(1).slice(0, 7); ayuda = 'Poné el mes y año de la próxima ITV que figura en la pegatina / tarjeta.'; }
   else if (tipo === 'SEGURO') { pf = masAnios(1); ayuda = 'Poné la fecha de vencimiento de la póliza nueva.'; }
   else if (tipo === 'ROTACIÓN NEUMÁTICOS' || tipo === 'CAMBIO NEUMÁTICOS') {
     const cada = (v && Number(v.ROTACION_KM)) || taller.rotacionKm;
@@ -1129,7 +1144,11 @@ function sugerirProximo() {
   else if (tipo === 'AMORTIGUADORES') { if (km) pk = km + 80000; ayuda = 'Suelen durar unos 80.000 km. Cambialo si querés otro aviso.'; }
   else if (tipo === 'PASTILLAS DE FRENO' || tipo === 'DISCOS DE FRENO') { ayuda = 'En híbridos y eléctricos duran mucho por la frenada regenerativa. Si querés aviso, poné unos km.'; }
   else ayuda = 'Si querés que te avise, poné una fecha o unos km.';
-  document.getElementById('sv_prox_fecha').value = pf;
+  // Para la ITV la próxima fecha es solo mes y año
+  const pfEl = document.getElementById('sv_prox_fecha');
+  pfEl.type = tipo === 'ITV' ? 'month' : 'date';
+  pfEl.previousElementSibling.textContent = tipo === 'ITV' ? 'Próxima ITV (mes y año)' : 'Próxima fecha';
+  pfEl.value = pf;
   document.getElementById('sv_prox_km').value = pk;
   document.getElementById('sv_ayuda').textContent = ayuda;
 }
@@ -1150,6 +1169,10 @@ async function saveServicio() {
   const g = id => document.getElementById(id).value.trim();
   const servicio = { VEHICULO_ID: g('sv_vehiculo'), TIPO: g('sv_tipo'), FECHA: g('sv_fecha'), KM: g('sv_km'),
     DETALLE: g('sv_detalle'), TALLER: g('sv_taller'), COSTE: g('sv_coste'), PROX_FECHA: g('sv_prox_fecha'), PROX_KM: g('sv_prox_km') };
+  if (servicio.TIPO === 'ITV' && servicio.PROX_FECHA) {
+    servicio.PROX_FECHA = mesAFecha(servicio.PROX_FECHA);
+    if (!servicio.PROX_FECHA) { showToast('Mes y año de la próxima ITV no válidos'); return; }
+  }
   if (servicio.TIPO === 'OTRO') {
     servicio.TIPO = g('sv_otro').toUpperCase();
     if (!servicio.TIPO) { showToast('Escribí qué se cambió'); return; }
@@ -1179,7 +1202,7 @@ function openVehiculo(id) {
   document.getElementById('vh_matricula').value = v ? v.MATRICULA : '';
   document.getElementById('vh_km').value = v && v.kmActual ? v.kmActual : '';
   document.getElementById('vh_rotacion').value = v ? (v.ROTACION_KM || '') : (taller ? taller.rotacionKm : 10000);
-  document.getElementById('vh_itv').value = v ? v.ITV_VENCE : '';
+  document.getElementById('vh_itv').value = v && v.ITV_VENCE ? String(v.ITV_VENCE).slice(0, 7) : '';
   document.getElementById('vh_seguro').value = v ? v.SEGURO_VENCE : '';
   document.getElementById('vh_notas').value = v ? v.NOTAS : '';
   document.getElementById('vh_borrar').classList.toggle('hidden', !v);
@@ -1191,6 +1214,10 @@ async function saveVehiculo() {
   const vehiculo = { ID: g('vh_id'), NOMBRE: g('vh_nombre'), MATRICULA: g('vh_matricula'), ROTACION_KM: g('vh_rotacion'),
     ITV_VENCE: g('vh_itv'), SEGURO_VENCE: g('vh_seguro'), NOTAS: g('vh_notas') };
   if (!vehiculo.NOMBRE) { showToast('Poné un nombre'); return; }
+  if (vehiculo.ITV_VENCE) {
+    vehiculo.ITV_VENCE = mesAFecha(vehiculo.ITV_VENCE);
+    if (!vehiculo.ITV_VENCE) { showToast('Mes y año de la ITV no válidos (ej: 04/2027)'); return; }
+  }
   // Los km solo se mandan si se cambiaron (si no, se pisaría el km que llegó de los choferes)
   const v = vehTaller(vehiculo.ID);
   if (g('vh_km') && Number(g('vh_km')) !== (v ? v.kmActual : 0)) vehiculo.KM_ACTUAL = g('vh_km');
