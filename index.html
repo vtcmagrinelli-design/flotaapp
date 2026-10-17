@@ -117,6 +117,31 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .modal-header h2 { font-size: 15px; font-weight: 700; color: #1B2838; }
 .btn-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #aaa; line-height: 1; }
+
+/* TALLER (mantenimiento de coches) */
+.nav-tab { position: relative; }
+.tab-badge { position: absolute; top: 4px; left: 50%; margin-left: 6px; background: #e74c3c; color: white; border-radius: 9px; font-size: 10px; min-width: 17px; height: 17px; line-height: 17px; padding: 0 4px; }
+.aviso { display: flex; gap: 10px; align-items: center; padding: 10px; border-radius: 10px; margin-bottom: 7px; font-size: 13px; }
+.aviso b { color: #1B2838; }
+.aviso .at { flex: 1; min-width: 0; }
+.aviso .as { font-size: 12px; font-weight: 700; margin-top: 2px; }
+.nv-vencido { background: #FADBD8; } .nv-vencido .as { color: #C0392B; }
+.nv-pronto { background: #FDEBD0; } .nv-pronto .as { color: #A04000; }
+.nv-ok { background: #EAFAF1; } .nv-ok .as { color: #1E8449; }
+.nv-sin_dato { background: #f4f6f8; } .nv-sin_dato .as { color: #999; }
+.veh-card { border: 1.5px solid #e8edf2; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.veh-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px; }
+.veh-name { font-size: 15px; font-weight: 800; color: #1B2838; }
+.veh-sub { font-size: 11px; color: #999; margin-top: 2px; }
+.veh-km { text-align: right; font-size: 18px; font-weight: 800; color: #2980B9; white-space: nowrap; }
+.veh-km small { display: block; font-size: 10px; color: #aaa; font-weight: 600; }
+.veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.veh-grid .aviso { margin: 0; display: block; padding: 8px; font-size: 11px; }
+.veh-grid .aviso b { font-size: 11px; }
+.serv-item { font-size: 12px; padding: 8px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; align-items: flex-start; }
+.serv-item:last-child { border-bottom: none; }
+.serv-item .sd { flex: 1; min-width: 0; color: #888; line-height: 1.45; }
+.serv-item .sd b { color: #2c3e50; }
 </style>
 </head>
 <body>
@@ -131,6 +156,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 <div class="nav-tabs" id="main_nav">
   <button class="nav-tab" id="tab_crm" onclick="showPage('crm',this)"><span class="ti">🏠</span>Inicio</button>
   <button class="nav-tab" id="tab_datos" onclick="showPage('datos',this)"><span class="ti">📡</span>Datos</button>
+  <button class="nav-tab" id="tab_taller" onclick="showPage('taller',this)" style="display:none"><span class="ti">🔧</span>Taller<span class="tab-badge hidden" id="taller_badge"></span></button>
   <button class="nav-tab active" id="tab_registro" onclick="showPage('registro',this)"><span class="ti">📋</span>Registro</button>
   <button class="nav-tab" id="tab_historial" onclick="showPage('historial',this)"><span class="ti">📊</span>Historial</button>
   <button class="nav-tab" id="tab_enviar" onclick="showPage('enviar',this)"><span class="ti">📤</span>Enviar</button>
@@ -170,6 +196,33 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
     </div>
     <div style="font-size:11px;color:#aaa;margin-bottom:8px">Marcá la casilla de lo que quieras borrar (por ejemplo, registros de prueba).</div>
     <div id="datos_list"><div class="empty-msg">⏳ Cargando...</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ===== TALLER (mantenimiento de coches, solo admin) ===== -->
+<div id="page_taller" class="page">
+<div class="container">
+  <div class="card">
+    <div class="crm-header">
+      <h2 style="margin:0">🔧 Mantenimiento</h2>
+      <div style="display:flex;gap:7px">
+        <button onclick="loadTaller()" style="background:rgba(41,128,185,0.15);color:#2980B9;border:1.5px solid #2980B9;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer">🔄</button>
+        <button onclick="openServicio()" style="background:#27AE60;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer">➕ Cargar cambio</button>
+      </div>
+    </div>
+    <div id="taller_avisos"><div class="empty-msg">⏳ Cargando...</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px">
+      <span style="font-size:11px;color:#aaa" id="taller_info"></span>
+      <button onclick="probarAvisos()" style="background:none;border:none;color:#2980B9;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">📧 Mandar aviso ahora</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="crm-header">
+      <h2 style="margin:0">🚗 Coches</h2>
+      <button onclick="openVehiculo()" style="background:#2980B9;color:white;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer">+ Coche</button>
+    </div>
+    <div id="taller_vehiculos"></div>
   </div>
 </div>
 </div>
@@ -384,6 +437,77 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
   </div>
 </div>
 
+<!-- MODAL CARGAR CAMBIO (mantenimiento) -->
+<div id="modal_servicio" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2>🔧 Cargar cambio</h2>
+      <button class="btn-close" onclick="closeModal('modal_servicio')">✕</button>
+    </div>
+    <div class="form-group"><label>Coche</label><select id="sv_vehiculo" onchange="sugerirProximo()"></select></div>
+    <div class="form-group">
+      <label>Qué se hizo</label>
+      <select id="sv_tipo" onchange="sugerirProximo()">
+        <option>ITV</option>
+        <option>ROTACIÓN NEUMÁTICOS</option>
+        <option>CAMBIO NEUMÁTICOS</option>
+        <option>SEGURO</option>
+        <option>REVISIÓN / SERVICIO</option>
+        <option>FRENOS</option>
+        <option>LÍQUIDO DE FRENOS</option>
+        <option>FILTRO HABITÁCULO</option>
+        <option>ALINEACIÓN</option>
+        <option>BATERÍA 12V</option>
+        <option>LIMPIAPARABRISAS</option>
+        <option>OTRO</option>
+      </select>
+    </div>
+    <div class="row2">
+      <div class="form-group"><label>Fecha</label><input type="date" id="sv_fecha" onchange="sugerirProximo()"></div>
+      <div class="form-group"><label>Km del coche</label><input type="number" id="sv_km" inputmode="numeric" placeholder="0" oninput="sugerirProximo()"></div>
+    </div>
+    <div class="form-group"><label>Detalle</label><input type="text" id="sv_detalle" placeholder="Ej: delanteras atrás, Michelin 255/45 R19..."></div>
+    <div class="row2">
+      <div class="form-group"><label>Taller</label><input type="text" id="sv_taller" placeholder="Opcional"></div>
+      <div class="form-group"><label>Coste (€)</label><input type="number" id="sv_coste" step="0.01" min="0" placeholder="0.00"></div>
+    </div>
+    <div class="section-divider">Próximo aviso</div>
+    <div class="row2">
+      <div class="form-group"><label>Próxima fecha</label><input type="date" id="sv_prox_fecha"></div>
+      <div class="form-group"><label>Próximos km</label><input type="number" id="sv_prox_km" inputmode="numeric" placeholder="—"></div>
+    </div>
+    <div id="sv_ayuda" style="font-size:11px;color:#888;margin:-4px 0 12px"></div>
+    <button class="btn-primary" id="sv_guardar" onclick="saveServicio()">💾 Guardar cambio</button>
+  </div>
+</div>
+
+<!-- MODAL COCHE -->
+<div id="modal_vehiculo" class="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-header">
+      <h2 id="vh_title">Coche</h2>
+      <button class="btn-close" onclick="closeModal('modal_vehiculo')">✕</button>
+    </div>
+    <input type="hidden" id="vh_id">
+    <div class="row2">
+      <div class="form-group"><label>Nombre</label><input type="text" id="vh_nombre" placeholder="Tesla Model Y"></div>
+      <div class="form-group"><label>Matrícula</label><input type="text" id="vh_matricula" placeholder="1234ABC"></div>
+    </div>
+    <div class="row2">
+      <div class="form-group"><label>Km actuales</label><input type="number" id="vh_km" inputmode="numeric" placeholder="0"></div>
+      <div class="form-group"><label>Rotar cada (km)</label><input type="number" id="vh_rotacion" inputmode="numeric" placeholder="10000"></div>
+    </div>
+    <div class="row2">
+      <div class="form-group"><label>ITV vence</label><input type="date" id="vh_itv"></div>
+      <div class="form-group"><label>Seguro vence</label><input type="date" id="vh_seguro"></div>
+    </div>
+    <div class="form-group"><label>Notas</label><input type="text" id="vh_notas" placeholder="Póliza, bastidor..."></div>
+    <div style="font-size:11px;color:#888;margin-bottom:12px">💡 Para que los km se actualicen solos con los que mandan los choferes, poné la matrícula también en el "Vehículo asignado" de cada chofer (Inicio).</div>
+    <button class="btn-primary" onclick="saveVehiculo()">💾 Guardar</button>
+    <button class="btn-red hidden" id="vh_borrar" onclick="deleteVehiculo()" style="margin-top:8px">🗑️ Borrar coche</button>
+  </div>
+</div>
+
 <!-- MODAL PIN (4 números, ocultos, teclado numérico) -->
 <div id="modal_pin" class="modal-overlay" style="z-index:700">
   <div style="background:white;border-radius:16px;max-width:320px;margin:120px auto 0;padding:22px;text-align:center">
@@ -406,7 +530,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-15.2';
+const APP_VERSION = '2026-10-17.2';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -581,6 +705,7 @@ function showPage(name, tabEl) {
   if (name === 'enviar') updateSendCount();
   if (name === 'crm') { renderCRM(); loadChoferes(true); } // refresca al entrar al panel
   if (name === 'datos') loadSheetData(); // antes había que tocar 🔄 para ver algo
+  if (name === 'taller') { renderTaller(); loadTaller(); }
 }
 
 // ---- SESSION ----
@@ -718,6 +843,8 @@ function applySession() {
     document.getElementById('header_user').textContent = '👑 Admin';
     document.getElementById('tab_crm').style.display = 'flex';
     document.getElementById('tab_datos').style.display = 'flex';
+    document.getElementById('tab_taller').style.display = 'flex';
+    loadTaller(true); // para el número de avisos en la pestaña
     // El admin no carga ni envía registros, y todo lo enviado lo ve en Datos: esas pestañas son de los choferes
     document.getElementById('tab_registro').style.display = 'none';
     document.getElementById('tab_historial').style.display = 'none';
@@ -728,6 +855,7 @@ function applySession() {
     document.getElementById('header_user').textContent = currentUser;
     document.getElementById('tab_crm').style.display = 'none';
     document.getElementById('tab_datos').style.display = 'none';
+    document.getElementById('tab_taller').style.display = 'none';
     document.getElementById('tab_registro').style.display = 'flex';
     document.getElementById('tab_historial').style.display = 'flex';
     document.getElementById('tab_enviar').style.display = 'flex';
@@ -776,6 +904,234 @@ async function logout() {
   document.getElementById('btn_logout').style.display = 'none';
   document.getElementById('header_user').textContent = '';
   showLoginModal();
+}
+
+// ---- TALLER (mantenimiento de coches) ----
+// Los datos viven en Google Sheets (hojas VEHICULOS y MANTENIMIENTOS); acá solo una copia para ver sin conexión
+let taller = null;
+try { taller = JSON.parse(localStorage.getItem('flota_taller') || 'null'); } catch(e) {}
+const tallerAbiertos = new Set(); // coches con el historial desplegado
+
+async function loadTaller(silent = false) {
+  try {
+    const res = await fetch(SCRIPT_URL + '?action=getMantenimiento&token=' + encodeURIComponent(adminToken), { method: 'GET', mode: 'cors' });
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || 'Respuesta con error');
+    if (!Array.isArray(json.vehiculos)) throw new Error('El Apps Script publicado está desactualizado');
+    taller = json;
+    try { localStorage.setItem('flota_taller', JSON.stringify(taller)); } catch(e) {}
+  } catch(e) {
+    if (!silent) showToast('⚠️ ' + (e.message === 'Failed to fetch' ? 'Sin conexión — datos guardados' : e.message));
+  }
+  renderTaller();
+}
+
+function fechaCorta(f) { return f ? f.split('-').reverse().join('/') : ''; }
+function kmTxt(n) { return Number(n || 0).toLocaleString('es-ES') + ' km'; }
+
+// Texto del estado de un aviso: "vence en 12 días", "faltan 800 km"...
+function avisoTxt(a) {
+  if (a.nivel === 'sin_dato') {
+    return a.tipo === 'ITV' ? 'Cargá la fecha de la ITV' : 'Cargá la última rotación';
+  }
+  const p = [];
+  if (a.fecha) p.push(a.dias < 0 ? 'Venció hace ' + (-a.dias) + ' días' : a.dias === 0 ? 'Vence HOY' :
+                     (a.dias <= 60 ? 'En ' + a.dias + ' días' : fechaCorta(a.fecha)));
+  if (a.km) p.push(a.faltan <= 0 ? 'Pasado ' + kmTxt(-a.faltan) : 'Faltan ' + kmTxt(a.faltan));
+  return p.join(' · ');
+}
+const tipoIcon = t => ({ 'ITV':'🛂', 'SEGURO':'🛡️', 'ROTACIÓN NEUMÁTICOS':'🔄', 'CAMBIO NEUMÁTICOS':'🛞', 'FRENOS':'🛑' }[t] || '🔧');
+
+function renderTaller() {
+  const avisosEl = document.getElementById('taller_avisos');
+  const vehEl = document.getElementById('taller_vehiculos');
+  const badge = document.getElementById('taller_badge');
+  if (!taller) { avisosEl.innerHTML = '<div class="empty-msg">⏳ Cargando...</div>'; vehEl.innerHTML = ''; return; }
+
+  const peso = { vencido: 3, pronto: 2, sin_dato: 1, ok: 0 };
+  const urgentes = [];
+  taller.vehiculos.forEach(v => v.avisos.forEach(a => {
+    if (a.nivel === 'vencido' || a.nivel === 'pronto') urgentes.push({ v, a });
+  }));
+  urgentes.sort((x, y) => peso[y.a.nivel] - peso[x.a.nivel] || (x.a.dias ?? 1e9) - (y.a.dias ?? 1e9));
+  badge.textContent = urgentes.length;
+  badge.classList.toggle('hidden', !urgentes.length);
+
+  avisosEl.innerHTML = urgentes.length ? urgentes.map(({ v, a }) => `
+    <div class="aviso nv-${a.nivel}">
+      <span style="font-size:20px">${a.nivel === 'vencido' ? '🚨' : '⚠️'}</span>
+      <div class="at"><b>${esc(a.tipo)}</b> · ${esc(v.NOMBRE)}<div class="as">${esc(avisoTxt(a))}</div></div>
+      <button class="btn-sm btn-edit" style="flex:0 0 auto" data-v="${esc(v.ID)}" data-t="${esc(a.tipo)}" onclick="openServicio(this.dataset.v,this.dataset.t)">Hecho ✓</button>
+    </div>`).join('')
+    : '<div class="aviso nv-ok"><span style="font-size:20px">✅</span><div class="at"><b>Todo al día</b><div class="as">Sin vencimientos en los próximos ' + taller.avisoDias + ' días ni ' + kmTxt(taller.avisoKm) + '</div></div></div>';
+  document.getElementById('taller_info').textContent = 'Te llega un mail cuando falten ' + taller.avisoDias + ' días o ' + kmTxt(taller.avisoKm) + '.';
+
+  const anio = (taller.hoy || '').slice(0, 4);
+  vehEl.innerHTML = taller.vehiculos.length ? taller.vehiculos.map(v => {
+    const servs = taller.servicios.filter(s => s.VEHICULO_ID === v.ID);
+    const gasto = servs.filter(s => String(s.FECHA).startsWith(anio)).reduce((t, s) => t + Number(s.COSTE || 0), 0);
+    const o = v.kmOrigen || {};
+    const origen = o.origen === 'chofer' ? 'según ' + o.chofer + ' ' + fechaCorta(o.fecha)
+                 : o.fecha ? (o.origen === 'cambio' ? 'del último cambio ' : 'cargado ') + fechaCorta(o.fecha) : 'sin cargar';
+    const abierto = tallerAbiertos.has(v.ID);
+    return `
+    <div class="veh-card">
+      <div class="veh-top">
+        <div><div class="veh-name">${esc(v.NOMBRE)}</div>
+          <div class="veh-sub">${esc(v.MATRICULA || 'Sin matrícula')}${gasto ? ' · Gastado ' + anio + ': ' + gasto.toFixed(2) + ' €' : ''}</div></div>
+        <div class="veh-km">${v.kmActual ? kmTxt(v.kmActual) : '— km'}<small>${esc(origen)}</small></div>
+      </div>
+      <div class="veh-grid">${v.avisos.map(a => `
+        <div class="aviso nv-${a.nivel}"><b>${tipoIcon(a.tipo)} ${esc(a.tipo)}</b>
+          <div class="as">${esc(avisoTxt(a))}</div>
+          ${a.fecha && a.dias > 60 ? '' : a.fecha ? '<div style="color:#999">' + fechaCorta(a.fecha) + '</div>' : ''}
+          ${a.km ? '<div style="color:#999">a los ' + kmTxt(a.km) + '</div>' : ''}
+        </div>`).join('')}</div>
+      <div class="chofer-actions">
+        <button class="btn-sm" style="background:#EAFAF1;color:#1E8449" data-v="${esc(v.ID)}" onclick="openServicio(this.dataset.v)">➕ Cambio</button>
+        <button class="btn-sm btn-edit" data-v="${esc(v.ID)}" onclick="actualizarKm(this.dataset.v)">📏 Km</button>
+        <button class="btn-sm btn-edit" data-v="${esc(v.ID)}" onclick="openVehiculo(this.dataset.v)">✏️ Editar</button>
+        <button class="btn-sm" style="background:#f4f6f8;color:#555" data-v="${esc(v.ID)}" onclick="toggleHistTaller(this.dataset.v)">📜 ${servs.length}</button>
+        <button class="btn-sm btn-delete" style="flex:0 0 40px" title="Borrar coche" data-v="${esc(v.ID)}" onclick="deleteVehiculo(this.dataset.v)">🗑️</button>
+      </div>
+      ${abierto ? `<div style="margin-top:10px">${servs.length ? servs.map(s => `
+        <div class="serv-item"><span>${tipoIcon(s.TIPO)}</span>
+          <div class="sd"><b>${esc(s.TIPO)}</b> · ${fechaCorta(s.FECHA)}${s.KM ? ' · ' + kmTxt(s.KM) : ''}${s.COSTE ? ' · ' + Number(s.COSTE).toFixed(2) + ' €' : ''}
+            ${s.DETALLE ? '<br>' + esc(s.DETALLE) : ''}${s.TALLER ? '<br>🏪 ' + esc(s.TALLER) : ''}
+            ${s.PROX_FECHA || s.PROX_KM ? '<br>⏭️ Próximo: ' + [fechaCorta(s.PROX_FECHA), s.PROX_KM ? kmTxt(s.PROX_KM) : ''].filter(Boolean).join(' o ') : ''}</div>
+          <button class="btn-del" data-s="${esc(s.ID)}" onclick="deleteServicio(this.dataset.s)">🗑️</button></div>`).join('')
+        : '<div class="empty-msg" style="padding:10px 0">Sin cambios cargados.</div>'}</div>` : ''}
+    </div>`;
+  }).join('') : '<div class="empty-msg">No hay coches. Tocá "+ Coche".</div>';
+}
+
+function toggleHistTaller(id) {
+  tallerAbiertos.has(id) ? tallerAbiertos.delete(id) : tallerAbiertos.add(id);
+  renderTaller();
+}
+
+function vehTaller(id) { return taller && taller.vehiculos.find(v => v.ID === id); }
+
+function openServicio(vehId, tipo) {
+  if (!taller || !taller.vehiculos.length) { showToast('Primero cargá un coche'); return; }
+  const sel = document.getElementById('sv_vehiculo');
+  sel.innerHTML = taller.vehiculos.map(v => `<option value="${esc(v.ID)}">${esc(v.NOMBRE)}${v.MATRICULA ? ' · ' + esc(v.MATRICULA) : ''}</option>`).join('');
+  if (vehId) sel.value = vehId;
+  if (tipo) document.getElementById('sv_tipo').value = tipo;
+  document.getElementById('sv_fecha').value = localDateStr(new Date());
+  const v = vehTaller(sel.value);
+  document.getElementById('sv_km').value = v && v.kmActual ? v.kmActual : '';
+  ['sv_detalle','sv_taller','sv_coste'].forEach(id => document.getElementById(id).value = '');
+  sugerirProximo();
+  document.getElementById('modal_servicio').style.display = 'block';
+}
+
+// Completa "próximo aviso" según lo que se hizo (se puede cambiar a mano)
+function sugerirProximo() {
+  const tipo = document.getElementById('sv_tipo').value;
+  const fecha = document.getElementById('sv_fecha').value;
+  const km = Number(document.getElementById('sv_km').value) || 0;
+  const v = vehTaller(document.getElementById('sv_vehiculo').value);
+  const masAnios = n => { if (!fecha) return ''; const [y, m, d] = fecha.split('-'); return (Number(y) + n) + '-' + m + '-' + d; };
+  let pf = '', pk = '', ayuda = '';
+  if (tipo === 'ITV') { pf = masAnios(1); ayuda = 'La fecha de la próxima ITV figura en la tarjeta que te dan. Revisala.'; }
+  else if (tipo === 'SEGURO') { pf = masAnios(1); ayuda = 'Poné la fecha de vencimiento de la póliza nueva.'; }
+  else if (tipo === 'ROTACIÓN NEUMÁTICOS' || tipo === 'CAMBIO NEUMÁTICOS') {
+    const cada = (v && Number(v.ROTACION_KM)) || taller.rotacionKm;
+    if (km) pk = km + cada;
+    ayuda = 'Próxima rotación cada ' + kmTxt(cada) + (km ? '' : ' — poné los km del coche.');
+  }
+  else if (tipo === 'LÍQUIDO DE FRENOS' || tipo === 'FILTRO HABITÁCULO') { pf = masAnios(2); ayuda = 'Tesla recomienda revisarlo cada 2 años.'; }
+  else ayuda = 'Si querés que te avise, poné una fecha o unos km.';
+  document.getElementById('sv_prox_fecha').value = pf;
+  document.getElementById('sv_prox_km').value = pk;
+  document.getElementById('sv_ayuda').textContent = ayuda;
+}
+
+async function postTaller(obj, okMsg) {
+  try {
+    await postToScript(Object.assign({ token: adminToken }, obj));
+    showToast(okMsg);
+    await loadTaller(true);
+    return true;
+  } catch(e) {
+    alert('⚠️ No se guardó.\n\n' + (e.message === 'Failed to fetch' ? 'Sin conexión.' : e.message));
+    return false;
+  }
+}
+
+async function saveServicio() {
+  const g = id => document.getElementById(id).value.trim();
+  const servicio = { VEHICULO_ID: g('sv_vehiculo'), TIPO: g('sv_tipo'), FECHA: g('sv_fecha'), KM: g('sv_km'),
+    DETALLE: g('sv_detalle'), TALLER: g('sv_taller'), COSTE: g('sv_coste'), PROX_FECHA: g('sv_prox_fecha'), PROX_KM: g('sv_prox_km') };
+  if (!servicio.FECHA) { showToast('Poné la fecha'); return; }
+  if ((servicio.TIPO === 'ROTACIÓN NEUMÁTICOS' || servicio.TIPO === 'CAMBIO NEUMÁTICOS') && !servicio.KM) {
+    showToast('Poné los km: con eso se calcula la próxima rotación'); return;
+  }
+  const btn = document.getElementById('sv_guardar');
+  btn.disabled = true; btn.textContent = '⏳ Guardando...';
+  const ok = await postTaller({ action: 'addServicio', servicio }, '✅ Cambio guardado');
+  btn.disabled = false; btn.textContent = '💾 Guardar cambio';
+  if (ok) closeModal('modal_servicio');
+}
+
+async function deleteServicio(id) {
+  const s = taller.servicios.find(x => x.ID === id);
+  if (!s || !confirm('¿Borrar ' + s.TIPO + ' del ' + fechaCorta(s.FECHA) + '?')) return;
+  await postTaller({ action: 'deleteServicio', id }, '🗑️ Borrado');
+}
+
+function openVehiculo(id) {
+  const v = id ? vehTaller(id) : null;
+  document.getElementById('vh_title').textContent = v ? '✏️ ' + v.NOMBRE : '🚗 Coche nuevo';
+  document.getElementById('vh_id').value = v ? v.ID : '';
+  document.getElementById('vh_nombre').value = v ? v.NOMBRE : '';
+  document.getElementById('vh_matricula').value = v ? v.MATRICULA : '';
+  document.getElementById('vh_km').value = v && v.kmActual ? v.kmActual : '';
+  document.getElementById('vh_rotacion').value = v ? (v.ROTACION_KM || '') : (taller ? taller.rotacionKm : 10000);
+  document.getElementById('vh_itv').value = v ? v.ITV_VENCE : '';
+  document.getElementById('vh_seguro').value = v ? v.SEGURO_VENCE : '';
+  document.getElementById('vh_notas').value = v ? v.NOTAS : '';
+  document.getElementById('vh_borrar').classList.toggle('hidden', !v);
+  document.getElementById('modal_vehiculo').style.display = 'block';
+}
+
+async function saveVehiculo() {
+  const g = id => document.getElementById(id).value.trim();
+  const vehiculo = { ID: g('vh_id'), NOMBRE: g('vh_nombre'), MATRICULA: g('vh_matricula'), ROTACION_KM: g('vh_rotacion'),
+    ITV_VENCE: g('vh_itv'), SEGURO_VENCE: g('vh_seguro'), NOTAS: g('vh_notas') };
+  if (!vehiculo.NOMBRE) { showToast('Poné un nombre'); return; }
+  // Los km solo se mandan si se cambiaron (si no, se pisaría el km que llegó de los choferes)
+  const v = vehTaller(vehiculo.ID);
+  if (g('vh_km') && Number(g('vh_km')) !== (v ? v.kmActual : 0)) vehiculo.KM_ACTUAL = g('vh_km');
+  if (await postTaller({ action: 'saveVehiculo', vehiculo }, '✅ Coche guardado')) closeModal('modal_vehiculo');
+}
+
+// Coche que ya no está en la flota: desaparece de la app y deja de avisar
+async function deleteVehiculo(id) {
+  const v = vehTaller(id || document.getElementById('vh_id').value);
+  if (!v || !confirm('¿Borrar ' + v.NOMBRE + (v.MATRICULA ? ' (' + v.MATRICULA + ')' : '') +
+                     '?\n\nDeja de aparecer y de avisar. Los cambios ya cargados quedan guardados en la planilla.')) return;
+  if (await postTaller({ action: 'deleteVehiculo', id: v.ID }, '🗑️ Coche borrado')) closeModal('modal_vehiculo');
+}
+
+async function actualizarKm(id) {
+  const v = vehTaller(id);
+  const km = prompt('Km actuales de ' + v.NOMBRE + ':', v.kmActual || '');
+  if (km === null || !km.trim()) return;
+  if (!(Number(km) > 0)) { showToast('Número de km no válido'); return; }
+  await postTaller({ action: 'saveVehiculo', vehiculo: { ID: v.ID, NOMBRE: v.NOMBRE, KM_ACTUAL: km } }, '✅ Km actualizados');
+}
+
+async function probarAvisos() {
+  showToast('📧 Enviando...');
+  try {
+    const json = await postToScript({ action: 'probarAvisos', token: adminToken });
+    if (json.action === 'enviado') showToast('✅ Mail enviado a ' + json.destino);
+    else showToast('✅ No hay nada por vencer: no hace falta mail');
+  } catch(e) {
+    alert('⚠️ No se pudo mandar el mail.\n\n' + e.message);
+  }
 }
 
 // ---- CRM ----
