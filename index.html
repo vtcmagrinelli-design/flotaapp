@@ -529,6 +529,15 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
       <div class="form-group"><label>Seguro vence</label><input type="date" id="vh_seguro"></div>
     </div>
     <div class="form-group"><label>Notas</label><input type="text" id="vh_notas" placeholder="Póliza, bastidor..."></div>
+    <div class="form-group">
+      <label>¿Para qué se usa?</label>
+      <div class="subtype-row" style="margin-bottom:4px">
+        <div class="subtype-btn" id="vh_uso_trabajo" onclick="elegirUso(false)">🚖 Trabajo</div>
+        <div class="subtype-btn" id="vh_uso_particular" onclick="elegirUso(true)">🏠 Particular</div>
+      </div>
+      <div style="font-size:11px;color:#aaa">Particular = solo mantenimiento: no aparece en las jornadas ni para asignar a choferes.</div>
+      <input type="hidden" id="vh_particular">
+    </div>
     <div style="font-size:11px;color:#888;margin-bottom:12px">💡 Para que los km se actualicen solos con los que mandan los choferes, poné la matrícula también en el "Vehículo asignado" de cada chofer (Inicio).</div>
     <button class="btn-primary" onclick="saveVehiculo()">💾 Guardar</button>
     <button class="btn-red hidden" id="vh_borrar" onclick="deleteVehiculo()" style="margin-top:8px">🗑️ Borrar coche</button>
@@ -570,7 +579,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-27.2';
+const APP_VERSION = '2026-10-27.4';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -1052,7 +1061,7 @@ function renderTaller() {
     return `
     <div class="veh-card">
       <div class="veh-top">
-        <div><div class="veh-name">${esc(v.NOMBRE)}</div>
+        <div><div class="veh-name">${esc(v.NOMBRE)}${v.PARTICULAR === 'SI' ? ' <span class="chofer-status" style="background:#F4ECF7;color:#8E44AD">🏠 Particular</span>' : ''}</div>
           <div class="veh-sub">${v.NOTAS ? esc(v.NOTAS) + ' · ' : ''}${esc(v.MATRICULA || 'Sin matrícula')}${gasto ? ' · Gastado ' + anio + ': ' + gasto.toFixed(2) + ' €' : ''}</div></div>
         <div class="veh-km">${v.kmActual ? kmTxt(v.kmActual) : '— km'}<small>${esc(origen)}</small></div>
       </div>
@@ -1207,15 +1216,26 @@ function openVehiculo(id) {
   document.getElementById('vh_itv').value = v && v.ITV_VENCE ? String(v.ITV_VENCE).slice(0, 7) : '';
   document.getElementById('vh_seguro').value = v ? v.SEGURO_VENCE : '';
   document.getElementById('vh_notas').value = v ? v.NOTAS : '';
+  // Coche nuevo: sin elegir (hay que tocar Trabajo o Particular); existente: lo que tiene
+  elegirUso(v ? v.PARTICULAR === 'SI' : null);
   document.getElementById('vh_borrar').classList.toggle('hidden', !v);
   document.getElementById('modal_vehiculo').style.display = 'block';
+}
+
+// particular: true / false / null (todavía sin elegir)
+function elegirUso(particular) {
+  document.getElementById('vh_particular').value = particular === null ? '' : particular ? 'SI' : 'NO';
+  document.getElementById('vh_uso_trabajo').classList.toggle('active', particular === false);
+  document.getElementById('vh_uso_particular').classList.toggle('active', particular === true);
 }
 
 async function saveVehiculo() {
   const g = id => document.getElementById(id).value.trim();
   const vehiculo = { ID: g('vh_id'), NOMBRE: g('vh_nombre'), MATRICULA: g('vh_matricula'), ROTACION_KM: g('vh_rotacion'),
-    ITV_VENCE: g('vh_itv'), SEGURO_VENCE: g('vh_seguro'), NOTAS: g('vh_notas') };
+    ITV_VENCE: g('vh_itv'), SEGURO_VENCE: g('vh_seguro'), NOTAS: g('vh_notas'),
+    PARTICULAR: document.getElementById('vh_particular').value === 'SI' };
   if (!vehiculo.NOMBRE) { showToast('Poné un nombre'); return; }
+  if (!document.getElementById('vh_particular').value) { showToast('Elegí si es de Trabajo o Particular'); return; }
   if (vehiculo.ITV_VENCE) {
     vehiculo.ITV_VENCE = mesAFecha(vehiculo.ITV_VENCE);
     if (!vehiculo.ITV_VENCE) { showToast('Mes y año de la ITV no válidos (ej: 04/2027)'); return; }
@@ -1305,11 +1325,12 @@ function renderCRM() {
 // Si el chofer tenía escrito un coche que no está en la lista, se mantiene como opción.
 function fillVehiculoSelect(actual) {
   const sel = document.getElementById('edit_vehiculo');
-  const opts = (taller ? taller.vehiculos : []).map(v => v.MATRICULA ? v.NOMBRE + ' - ' + v.MATRICULA : v.NOMBRE);
+  // Solo coches de trabajo (los particulares, como el Toyota de Paola, no se asignan a choferes)
+  const lista = (taller ? taller.vehiculos : []).filter(v => v.PARTICULAR !== 'SI');
+  const opts = lista.map(v => v.MATRICULA ? v.NOMBRE + ' - ' + v.MATRICULA : v.NOMBRE);
   actual = String(actual || '').trim();
   const norm = s => s.toUpperCase().replace(/[^A-Z0-9]/g, '');
   // Si lo guardado contiene la matrícula de un coche (o es su nombre, p. ej. "Lexus"), se selecciona ese coche
-  const lista = taller ? taller.vehiculos : [];
   const match = actual && (lista.find(v => v.MATRICULA && norm(actual).includes(norm(v.MATRICULA))) ||
                            lista.find(v => norm(v.NOMBRE) === norm(actual)));
   const valor = match ? (match.MATRICULA ? match.NOMBRE + ' - ' + match.MATRICULA : match.NOMBRE) : actual;
