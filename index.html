@@ -185,6 +185,8 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
     </div>
     <!-- Stats resumen -->
     <div id="datos_stats" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px"></div>
+    <!-- Km por coche (según el filtro de chofer / mes) -->
+    <div id="datos_km_coches"></div>
     <!-- Lista -->
     <!-- Barra de borrado: aparece al marcar registros o jornadas -->
     <div id="datos_sel_bar" style="display:none;position:sticky;top:58px;z-index:50;background:#FADBD8;border-radius:10px;padding:10px 12px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px">
@@ -568,7 +570,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-17.10';
+const APP_VERSION = '2026-10-27.1';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -1586,8 +1588,19 @@ function normJornada(r) {
     fotos: Number(r['FOTOS']) || 0,
     carpeta: String(r['CARPETA_FOTOS'] || ''),
     nota: String(r['NOTA'] || ''),
-    registros: Number(r['REGISTROS']) || 0
+    registros: Number(r['REGISTROS']) || 0,
+    vehiculo: String(r['VEHICULO'] || '') // coche elegido ese día (choferes sin coche fijo, p. ej. Pao)
   };
+}
+
+// Coche de una jornada: el que eligió ese día o, si no, el asignado al chofer (nombre del Taller si coincide)
+function cocheDeJornada(j) {
+  const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const texto = j.vehiculo || (choferes.find(c => c.name === j.chofer) || {}).vehiculo || '';
+  if (!norm(texto)) return '';
+  const coincide = vehiculosLista.filter(n => norm(texto) === norm(n) || norm(texto).startsWith(norm(n)))
+                                 .sort((a, b) => norm(b).length - norm(a).length)[0];
+  return coincide || String(texto).trim().toUpperCase();
 }
 
 // Última copia descargada, para verla sin conexión
@@ -2029,6 +2042,27 @@ function renderSheetData() {
       <div class="cl" style="font-size:10px;color:#888;margin-top:2px">Km</div>
     </div>`;
 
+  // Km recorridos por coche y último km (cuentakilómetros) que mandaron
+  const porCoche = {};
+  jornadas.forEach(j => {
+    const coche = cocheDeJornada(j) || 'SIN COCHE';
+    const c = porCoche[coche] || (porCoche[coche] = { km: 0, dias: 0, ultimo: 0, fechaUlt: '', choferes: new Set() });
+    c.km += j.km; c.dias++; c.choferes.add(j.chofer);
+    if (j.kmFin && j.fecha >= c.fechaUlt) { c.ultimo = j.kmFin; c.fechaUlt = j.fecha; }
+  });
+  const coches = Object.entries(porCoche).sort((a, b) => b[1].km - a[1].km);
+  document.getElementById('datos_km_coches').innerHTML = coches.length ? `
+    <div style="border:1.5px solid #e0eaf4;border-radius:10px;overflow:hidden;margin-bottom:12px">
+      <div style="background:#f0f7ff;padding:8px 12px;font-size:12px;font-weight:800;color:#1B2838">🚗 Km por coche</div>
+      ${coches.map(([coche, c]) => `
+      <div style="display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-top:1px solid #f0f0f0;font-size:12px">
+        <div><b style="color:#1B2838">${esc(coche)}</b>
+          <div style="color:#aaa">${c.dias} jornada${c.dias === 1 ? '' : 's'} · ${esc([...c.choferes].join(', '))}</div></div>
+        <div style="text-align:right;white-space:nowrap"><b style="color:#2980B9;font-size:14px">${kmTxt(c.km)}</b>
+          ${c.ultimo ? '<div style="color:#aaa">último: ' + kmTxt(c.ultimo) + ' (' + fechaCorta(c.fechaUlt) + ')</div>' : ''}</div>
+      </div>`).join('')}
+    </div>` : '';
+
   if (!filtered.length && !jornadas.length) {
     document.getElementById('datos_list').innerHTML = '<div class="empty-msg">Sin datos para este filtro</div>';
     return;
@@ -2049,7 +2083,7 @@ function renderSheetData() {
           <span style="font-weight:700;color:#2980B9">${j.km ? j.km + ' km' : 'sin km'}</span>
         </div>
         <div style="color:#aaa;margin-top:2px">
-          ${j.kmIni || j.kmFin ? esc(j.kmIni) + ' → ' + esc(j.kmFin) : ''}
+          ${cocheDeJornada(j) ? '🚗 ' + esc(cocheDeJornada(j)) + ' · ' : ''}${j.kmIni || j.kmFin ? esc(j.kmIni) + ' → ' + esc(j.kmFin) : ''}
           ${j.registros ? ' · ' + j.registros + ' registros' : ' · sin registros'}
           ${j.fotos ? ` · 📷 ${j.fotos} foto${j.fotos === 1 ? '' : 's'}${j.carpeta ? ` <a href="${esc(j.carpeta)}" target="_blank" style="color:#2980B9;font-weight:700">Ver</a>` : ''}` : ''}
           ${j.nota ? '<br><em>' + esc(j.nota) + '</em>' : ''}
