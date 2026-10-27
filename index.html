@@ -570,7 +570,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywOZFVnwnCrRU4qn3fRY3johd0u7QTuIUsnC7GxvnKPAvMYMdTrImFyGWYA4xZvZSa/exec';
 const KM_OBLIGATORIOS = true; // false = los choferes pueden enviar sin Km inicio / Km fin
 // Cambiar este número en cada actualización: los teléfonos detectan la versión nueva y se recargan solos
-const APP_VERSION = '2026-10-27.1';
+const APP_VERSION = '2026-10-27.2';
 
 // El iPhone (sobre todo la app del ícono) guarda copias viejas de la página.
 // Al abrir/volver a la app se compara con la versión publicada y, si hay una nueva, se recarga.
@@ -1589,8 +1589,23 @@ function normJornada(r) {
     carpeta: String(r['CARPETA_FOTOS'] || ''),
     nota: String(r['NOTA'] || ''),
     registros: Number(r['REGISTROS']) || 0,
-    vehiculo: String(r['VEHICULO'] || '') // coche elegido ese día (choferes sin coche fijo, p. ej. Pao)
+    vehiculo: String(r['VEHICULO'] || ''), // coche elegido ese día (choferes sin coche fijo, p. ej. Pao)
+    horaIni: horaTxt(r['HORA_INICIO']), horaFin: horaTxt(r['HORA_FIN'])
   };
+}
+
+// "08:30" (o "8:30:00") → "08:30"; vacío si no hay hora
+function horaTxt(v) {
+  const m = String(v || '').match(/(\d{1,2}):(\d{2})/);
+  return m ? m[1].padStart(2, '0') + ':' + m[2] : '';
+}
+// Horas trabajadas entre inicio y fin ("9h 30m"); si termina pasada la medianoche, cuenta hasta el día siguiente
+function duracionTxt(ini, fin) {
+  if (!ini || !fin) return '';
+  const min = t => +t.slice(0, 2) * 60 + +t.slice(3, 5);
+  let d = min(fin) - min(ini);
+  if (d <= 0) d += 24 * 60;
+  return Math.floor(d / 60) + 'h' + (d % 60 ? ' ' + String(d % 60).padStart(2, '0') + 'm' : '');
 }
 
 // Coche de una jornada: el que eligió ese día o, si no, el asignado al chofer (nombre del Taller si coincide)
@@ -2082,6 +2097,9 @@ function renderSheetData() {
           <span style="font-weight:700;color:#1B2838">🛣️ Jornada ${esc(j.fecha)}</span>
           <span style="font-weight:700;color:#2980B9">${j.km ? j.km + ' km' : 'sin km'}</span>
         </div>
+        <div style="color:#555;margin-top:2px">🕐 ${j.horaIni || j.horaFin
+          ? esc(j.horaIni || '?') + ' a ' + esc(j.horaFin || '?') + (duracionTxt(j.horaIni, j.horaFin) ? ' · <b>' + duracionTxt(j.horaIni, j.horaFin) + '</b>' : '')
+          : '<span style="color:#bbb">sin horario</span>'}</div>
         <div style="color:#aaa;margin-top:2px">
           ${cocheDeJornada(j) ? '🚗 ' + esc(cocheDeJornada(j)) + ' · ' : ''}${j.kmIni || j.kmFin ? esc(j.kmIni) + ' → ' + esc(j.kmFin) : ''}
           ${j.registros ? ' · ' + j.registros + ' registros' : ' · sin registros'}
